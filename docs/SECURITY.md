@@ -87,6 +87,9 @@ hook. Claude Code runs it before every tool call; it is not part of the model.
 
 Repository settings and hooks apply to cloud sessions that use a single
 repository outside a Project, which is how the scheduled task is configured.
+Verified on 3 Nov 2026: in a headless Claude Code session started from this
+repository with lockdown on, the hook refused `printenv` before it ran
+("Cheez guard: that program or path is not allowed").
 
 ## Where data goes
 

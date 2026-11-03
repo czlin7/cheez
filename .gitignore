@@ -27,3 +27,4 @@ dist/
 .DS_Store
 node_modules/
 /screenshots/
+/backup-out/

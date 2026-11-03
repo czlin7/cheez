@@ -137,6 +137,10 @@ beat five thin ones.
 
 ## 4. Write `var/editions/<id>/editorial.json`
 
+If more than 30 minutes have passed since `cheez prepare`, run `cheez refresh`
+first and re-read the brief's market table and stock facts, so the numbers you
+quote and the levels you propose match what will be published.
+
 The schema is `cheez.models.Editorial`. `fixtures/demo/editorial.json` is a
 complete example of the format (its content is fictional; never copy facts
 from it). Key fields:

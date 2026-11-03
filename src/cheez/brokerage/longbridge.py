@@ -20,6 +20,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -93,9 +94,13 @@ def load_token(env: Optional[dict] = None) -> Optional[dict]:
             tok = json.loads(base64.b64decode(raw).decode())
         except Exception:
             raise ValueError(f"{TOKEN_ENV} is not valid JSON (or base64 JSON)")
+    if not isinstance(tok, dict):
+        raise ValueError(f"{TOKEN_ENV} must be a JSON object")
     for k in ("client_id", "access_token", "refresh_token"):
-        if not tok.get(k):
+        if not isinstance(tok.get(k), str) or not tok.get(k):
             raise ValueError(f"{TOKEN_ENV} is missing '{k}'")
+    if not re.fullmatch(r"[A-Za-z0-9_.\-]{1,128}", tok["client_id"]) or tok["client_id"] in (".", ".."):
+        raise ValueError(f"{TOKEN_ENV} has an invalid client_id")
     return tok
 
 
@@ -120,6 +125,7 @@ def token_scopes(tok: dict) -> tuple[Optional[set[str]], Optional[str]]:
         for k in ("scope", "scp", "scopes"):
             if k in claims:
                 candidates.append(claims[k])
+    found: list[set[str]] = []
     for c in candidates:
         items: Iterable[str]
         if isinstance(c, str):
@@ -128,8 +134,15 @@ def token_scopes(tok: dict) -> tuple[Optional[set[str]], Optional[str]]:
             items = [str(x) for x in c]
         else:
             continue
-        return {SCOPE_IDS.get(str(i), str(i)) for i in items}, "token"
-    return None, None
+        found.append({SCOPE_IDS.get(str(i), str(i)) for i in items})
+    if not found:
+        return None, None
+    # Every place the token states its scopes must agree; the union is what is checked,
+    # so a hand-edited "scope" field cannot hide a broader grant inside the JWT.
+    union = set().union(*found)
+    if any(f != found[0] for f in found):
+        union.add("conflicting-scope-claims")
+    return union, "token"
 
 
 def _expiry(tok: dict) -> Optional[datetime]:
@@ -474,10 +487,7 @@ def child_main() -> int:  # pragma: no cover - exercised via subprocess in tests
     else:
         tok = load_token()
         assert tok is not None
-        home = tempfile.mkdtemp(prefix="cheez-lb-")
-        import atexit
-
-        atexit.register(shutil.rmtree, home, True)  # the token copy never outlives this process
+        home = os.environ["CHEEZ_LB_HOME"]  # created, and always deleted, by the parent process
         os.environ["HOME"] = home
         tdir = os.path.join(home, ".longbridge", "openapi", "tokens")
         os.makedirs(tdir, mode=0o700)
@@ -575,7 +585,10 @@ def child_main() -> int:  # pragma: no cover - exercised via subprocess in tests
 def fetch_snapshot(now: datetime, env: Optional[dict] = None, timeout: int = CHILD_TIMEOUT_S) -> PortfolioSnapshot:
     env = dict(env if env is not None else os.environ)
     if not env.get("CHEEZ_LB_MOCK_URL"):
-        chk = check_boundary(env, now)
+        try:
+            chk = check_boundary(env, now)
+        except Exception as e:  # never let a malformed credential abort the whole edition
+            return PortfolioSnapshot(status="error", messages=[f"The Longbridge credential could not be read ({type(e).__name__})."])
         if not chk.ok:
             status = "unconfigured" if "No Longbridge OAuth token" in chk.reason else "error"
             return PortfolioSnapshot(status=status, messages=[chk.reason])
@@ -590,24 +603,31 @@ def fetch_snapshot(now: datetime, env: Optional[dict] = None, timeout: int = CHI
     src_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     env["PYTHONPATH"] = src_dir + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
     workdir = tempfile.mkdtemp(prefix="cheez-lb-cwd-")  # empty: the SDK reads .env from the working directory
+    home = tempfile.mkdtemp(prefix="cheez-lb-home-")  # the child's private HOME for the token copy
+    env["CHEEZ_LB_HOME"] = home
     try:
         proc = subprocess.run([sys.executable, "-m", "cheez.brokerage.longbridge"], env=env, capture_output=True,
                               text=True, timeout=timeout, cwd=workdir)
     except subprocess.TimeoutExpired:
         return PortfolioSnapshot(status="error", messages=[f"Longbridge did not respond within {timeout} seconds."])
     finally:
+        # Deleted here, in the parent, so the token copy is removed even if the child was killed.
         shutil.rmtree(workdir, ignore_errors=True)
+        shutil.rmtree(home, ignore_errors=True)
     if proc.returncode != 0:
         err = proc.stderr or ""
         if "REAUTH_REQUIRED" in err:
             msg = "Longbridge authorisation has expired and could not be refreshed. Re-authorise (see docs/SETUP.md)."
-        elif "403308" in err or "scope" in err.lower():
-            msg = "Longbridge refused a read for lack of scope (403308). Check the granted scopes."
+        elif "403308" in err:
+            msg = "Longbridge refused a read (error 403308: missing scope, or no permission for that market)."
         else:
-            last = [ln for ln in err.strip().splitlines() if ln.strip()][-1:] or ["unknown error"]
-            msg = "Longbridge snapshot failed: " + _redact(last[0])[:200]
+            kind = re.findall(r"^([A-Za-z_][\w.]*(?:Error|Exception))\b", err, re.M)
+            msg = f"Longbridge snapshot failed ({kind[-1] if kind else 'unknown error'}). Details are not published."
         return PortfolioSnapshot(status="error", messages=[msg])
-    snap = PortfolioSnapshot.model_validate_json(proc.stdout)
+    try:
+        snap = PortfolioSnapshot.model_validate_json(proc.stdout)
+    except Exception:
+        return PortfolioSnapshot(status="error", messages=["Longbridge returned data Cheez could not read."])
     snap.messages.extend(warnings)
     if "token_rotated" in (proc.stderr or ""):
         snap.messages.append("Longbridge issued a new refresh token during this run. Cheez cannot save it back to the "
@@ -616,10 +636,7 @@ def fetch_snapshot(now: datetime, env: Optional[dict] = None, timeout: int = CHI
 
 
 def _redact(s: str) -> str:
-    import re
-
-    s = re.sub(r"[A-Za-z0-9_\-]{24,}", "[redacted]", s)
-    return s
+    return re.sub(r"[A-Za-z0-9_\-.%+/=]{16,}", "[redacted]", s)
 
 
 if __name__ == "__main__":  # pragma: no cover

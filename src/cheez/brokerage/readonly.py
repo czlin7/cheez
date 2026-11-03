@@ -74,25 +74,42 @@ class ReadOnlyViolation(PermissionError):
 
 
 class ReadOnlyProxy:
-    """Wraps an SDK context and exposes only allow-listed methods."""
+    """Wraps an SDK context and exposes only allow-listed methods.
 
-    __slots__ = ("_target", "_allow", "_name")
+    The wrapped object is held in a closure, not an attribute, and allowed
+    methods are returned as plain functions (no ``__self__``), so the raw SDK
+    context cannot be reached through the proxy."""
+
+    __slots__ = ("_call", "_allow", "_name")
 
     def __init__(self, target: Any, allow: frozenset[str], name: str):
-        object.__setattr__(self, "_target", target)
+        def call(item: str) -> Any:
+            fn = getattr(target, item)
+
+            def method(*args: Any, **kwargs: Any) -> Any:
+                return fn(*args, **kwargs)
+
+            method.__name__ = item
+            return method
+
+        object.__setattr__(self, "_call", call)
         object.__setattr__(self, "_allow", allow)
         object.__setattr__(self, "_name", name)
 
-    def __getattr__(self, item: str) -> Any:
-        if item in self._allow:
-            return getattr(self._target, item)
-        raise ReadOnlyViolation(f"{self._name}.{item} is not on Cheez's read-only allowlist")
+    def __getattribute__(self, item: str) -> Any:
+        if item.startswith("__") and item in ("__class__", "__dir__", "__repr__", "__setattr__"):
+            return object.__getattribute__(self, item)
+        allow = object.__getattribute__(self, "_allow")
+        name = object.__getattribute__(self, "_name")
+        if item in allow:
+            return object.__getattribute__(self, "_call")(item)
+        raise ReadOnlyViolation(f"{name}.{item} is not on Cheez's read-only allowlist")
 
     def __setattr__(self, key: str, value: Any) -> None:
         raise ReadOnlyViolation("read-only proxy cannot be modified")
 
     def __dir__(self) -> list[str]:
-        return sorted(self._allow)
+        return sorted(object.__getattribute__(self, "_allow"))
 
 
 # Raw HTTP is used only as a fallback when the typed SDK cannot parse a read

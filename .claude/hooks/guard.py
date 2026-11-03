@@ -2,17 +2,25 @@
 """Cheez PreToolUse guard (standard library only).
 
 Claude Code runs this before every tool call in this repository. It enforces
-the read-only brokerage boundary at the harness level, outside the model:
+the read-only brokerage boundary at the harness level, outside the model.
 
-* Always: block any tool input that would call a Longbridge mutating method,
-  construct a raw/unsafe SDK client, or reach the broker API directly.
+* Always: block Python that would call a Longbridge mutating method or build a
+  raw SDK client (Bash commands that run Python, and source files under src/).
 * Lockdown (a Longbridge credential is present in the environment, i.e. the
-  scheduled Cheez environment): the agent may only run `cheez` commands and a
-  few read-only shell utilities, may only write inside var/, may not read the
-  credential or process environment, and may not send the credential anywhere.
+  scheduled Cheez environment): an allowlist, not a denylist.
+  - Bash: only a fixed set of command shapes: the setup steps, `.venv/bin/cheez`
+    with validated arguments, and a few harmless git/status commands. No cd,
+    globs, '..', redirection, pipes, variables or substitutions.
+  - Read/Grep/Glob: only inside the repository and Claude's own scratch and
+    tool-result folders, checked on resolved paths (so /proc, /dev/fd, temporary
+    copies and symlink tricks are out of reach).
+  - Write/Edit: only data files (json, md, txt, html) inside var/ or the scratch
+    folder, checked on resolved paths.
+  - No connectors; no tool call may contain the credential; the agent may not
+    contact the broker directly.
 
-Exit code 2 blocks the call and shows the reason to the model. Any internal
-error in lockdown blocks the call (fail closed).
+The hook is registered as `python3 guard.py || exit 2`, so if this file is
+missing or crashes, the tool call is blocked (fail closed).
 """
 
 from __future__ import annotations
@@ -26,67 +34,67 @@ import sys
 TOKEN_ENV = "CHEEZ_LONGBRIDGE_OAUTH"
 LEGACY_ENV = ("LONGBRIDGE_APP_KEY", "LONGBRIDGE_APP_SECRET", "LONGBRIDGE_ACCESS_TOKEN",
               "LONGPORT_APP_KEY", "LONGPORT_APP_SECRET", "LONGPORT_ACCESS_TOKEN")
+BRANCH = "claude/cheez-daily-briefing-1ce5zf"
 
 MUTATING = re.compile(
     r"\.\s*(submit_order|submit_multileg|replace_order|cancel_order|create_watchlist_group|update_watchlist_group|"
     r"delete_watchlist_group|update_pinned|refresh_access_token(?:_async)?|create_topic(?:_reply)?|set_reminder|"
-    r"continue_conversation|conversation)\s*\(|"
+    r"continue_conversation)\s*\(|"
     r"\b(AlertContext|SharelistContext|DCAContext|GridContext|FundContext|AgentContext|ContentContext)\s*\(|"
     r"\bHttpClient\s*\.\s*from_",
-    re.I,
 )
-# Direct broker endpoints: only the cheez package talks to Longbridge, never the agent.
 BROKER_DIRECT = re.compile(
     r"\b(openapi|openapi-trade|openapi-quote|mcp)\.(longbridge|longportapp|longport|longbridgeapp)\.(com|cn)\b|"
     r"/v1/trade/order|/v1/watchlist|/v1/alert|/v1/asset/|/oauth2/",
     re.I,
 )
-
-SHELL_META = re.compile(r"[`<>;|]|\$\(|\$\{|\$[A-Za-z_]|&(?!&)")
-BASH_FORBIDDEN_WORDS = re.compile(
-    r"\b(env|printenv|export|set|declare|eval|exec|source\s+/proc|curl|wget|nc|ncat|socat|ssh|scp|node|deno|bun|"
-    r"perl|ruby|php|osascript|base64|xxd|openssl|python[0-9.]*\s+-c|python[0-9.]*\s+-(?!m\s)|bash\s+-c|sh\s+-c|zsh\s+-c)\b|"
-    r"/proc/|/run/|\.longbridge|\.ssh|\.credentials|\.ccr|\.netrc|\.git-credentials|\.config/gh",
-    re.I,
-)
-ALLOWED_COMMANDS = [
-    re.compile(r"^(\./)?(\.venv/bin/)?cheez(\s+[\w@:/.,=+'\" -]*)?$"),
-    re.compile(r"^(\.venv/bin/)?python[0-9.]*\s+-m\s+cheez(\s+[\w@:/.,=+'\" -]*)?$"),
-    re.compile(r"^(uv\s+)?pip[0-9.]*\s+install\s+(-q\s+)?(-e\s+)?['\"]?\.(\[brokerage\])?['\"]?(\s+-q)?$"),
-    re.compile(r"^(\.venv/bin/)?python[0-9.]*\s+-m\s+pip\s+install\s+(-q\s+)?(-e\s+)?['\"]?\.(\[brokerage\])?['\"]?(\s+-q)?$"),
-    re.compile(r"^(uv\s+venv|python[0-9.]*\s+-m\s+venv)\s+\.venv(\s+-q)?$"),
-    re.compile(r"^(\.|source)\s+\.venv/bin/activate$"),
-    re.compile(r"^cd\s+[\w/.~-]+$"),
-    re.compile(r"^git\s+(status|log|rev-parse|branch|diff)(\s+[\w/.:@^~-]*)*$"),
-    re.compile(r"^git\s+(fetch|checkout|switch|pull)\s+(origin\s+)?[\w/.-]+(\s+[\w/.-]+)?$"),
-    # No `find` (its -exec runs programs) and no test runners: use the Glob and Grep tools instead.
-    re.compile(r"^(ls|pwd|date|wc|head|tail|cat|grep|stat|du|df|nproc|true)(\s+[\w/.:*=,+@%-]+)*$"),
-    re.compile(r"^mkdir\s+-p\s+var/[\w/.-]+$"),
-    re.compile(r"^cp\s+[\w/.@-]+\s+var/[\w/.-]+$"),
-]
+ARG_META = re.compile(r"[`<>;|*?\[\]{}~\\$]|\.\.")
+DATA_EXT = (".json", ".md", ".txt", ".html")
+TICKER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.\-]{0,11}$")
+EXACT = {
+    ("git", "fetch", "origin", BRANCH), ("git", "checkout", BRANCH), ("git", "status"),
+    ("git", "rev-parse", "HEAD"), ("git", "log", "--oneline", "-5"),
+    ("python3", "-m", "venv", ".venv"), ("pwd",), ("date",), ("date", "-u"), ("true",),
+    (".venv/bin/pip", "install", "-q", "-e", ".[brokerage]"),
+    (".venv/bin/pip", "install", "-e", ".[brokerage]", "-q"),
+    (".venv/bin/pip", "install", "-q", "-e", "."),
+}
 
 
 def _repo() -> str:
     return os.path.realpath(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
 
 
+def _roots(write: bool) -> list[str]:
+    roots = [os.path.join(_repo(), "var") if write else _repo(), "/tmp/claude-0"]
+    if not write:
+        roots.append(os.path.join(os.path.expanduser("~"), ".claude", "projects"))
+    for k in ("CLAUDE_SCRATCHPAD_DIR", "CHEEZ_HOME"):
+        if os.environ.get(k):
+            roots.append(os.environ[k])
+    return [os.path.realpath(r) + os.sep for r in roots]
+
+
+def _resolve(path: str) -> str:
+    return os.path.realpath(path if os.path.isabs(path) else os.path.join(_repo(), path))
+
+
+def _inside(path: str, roots: list[str]) -> bool:
+    p = _resolve(path) + os.sep
+    return any(p.startswith(r) for r in roots)
+
+
 def _secrets(env: dict) -> list[str]:
     raw = env.get(TOKEN_ENV) or ""
-    out = []
+    out: list[str] = []
     try:
         tok = json.loads(raw)
-        for k in ("access_token", "refresh_token"):
-            v = str(tok.get(k) or "")
-            if len(v) >= 12:
-                out.append(v)
+        if isinstance(tok, dict):
+            out = [str(tok.get(k) or "") for k in ("access_token", "refresh_token")]
     except Exception:
-        if len(raw) >= 12:
-            out.append(raw)
-    for k in LEGACY_ENV:
-        v = env.get(k) or ""
-        if len(v) >= 12:
-            out.append(v)
-    return out
+        out = [raw]
+    out += [env.get(k) or "" for k in LEGACY_ENV]
+    return [s for s in out if len(s) >= 12]
 
 
 def lockdown(env: dict) -> bool:
@@ -95,55 +103,97 @@ def lockdown(env: dict) -> bool:
 
 def _contains_secret(blob: str, secrets: list[str]) -> bool:
     for s in secrets:
-        for i in range(0, max(1, len(s) - 15), 8):
-            if s[i:i + 16] and s[i:i + 16] in blob:
+        for i in range(0, max(1, len(s) - 11), 4):
+            if s[i:i + 12] in blob:
                 return True
+    return False
+
+
+# ------------------------------------------------------------- Bash allowlist
+
+def _cheez_args_ok(args: list[str]) -> bool:
+    if not args:
+        return False
+    sub, rest = args[0], args[1:]
+    if sub in ("status", "refresh", "check"):
+        return rest == [] or (len(rest) == 2 and rest[0] == "--edition" and bool(re.match(r"^\d{4}-\d{2}-\d{2}-us$", rest[1])))
+    if sub == "add-stocks":
+        return 0 < len(rest) <= 20 and all(TICKER.match(t) for t in rest)
+    if sub == "prepare":
+        i = 0
+        while i < len(rest):
+            a = rest[i]
+            if a == "--force":
+                i += 1
+            elif a == "--trigger" and i + 1 < len(rest) and rest[i + 1] in ("scheduled", "manual", "test"):
+                i += 2
+            elif a == "--state-from" and i + 1 < len(rest):
+                p = rest[i + 1]
+                if ARG_META.search(p) or not p.endswith(".html") or not _inside(p, _roots(False)) \
+                        or not os.path.isfile(_resolve(p)):
+                    return False
+                i += 2
+            else:
+                return False
+        return True
+    if sub == "render":
+        return rest in ([], ["--closed"]) or (len(rest) == 2 and rest[0] == "--market-only")
+    if sub == "fail":
+        return len(rest) == 1
     return False
 
 
 def _bash_ok(cmd: str) -> tuple[bool, str]:
     cmd = cmd.strip()
-    if "\n" in cmd:
+    if "\n" in cmd or "\r" in cmd:
         return False, "multi-line shell commands are not allowed in the Cheez scheduled environment"
-    if SHELL_META.search(cmd.replace("&&", " ").replace("2>&1", "")):
-        return False, "shell redirection, pipes, substitution and variables are not allowed here"
-    if BASH_FORBIDDEN_WORDS.search(cmd):
-        return False, "that program or path is not allowed in the Cheez scheduled environment"
-    for part in [p.strip() for p in cmd.replace("2>&1", "").split("&&")]:
+    body = cmd.replace(" 2>&1", "")
+    for part in [p.strip() for p in body.split("&&")]:
         if not part:
             continue
+        # Shell operators are refused outside quotes; free text is allowed only as the reason argument.
         try:
-            shlex.split(part)
+            lex = shlex.shlex(part, posix=True, punctuation_chars=True)
+            lex.whitespace_split = True
+            tokens = list(lex)
+            argv = shlex.split(part)
         except ValueError:
             return False, "unparseable command"
-        if not any(rx.match(part) for rx in ALLOWED_COMMANDS):
-            return False, f"only `cheez` commands and read-only utilities may run here (blocked: {part[:80]!r})"
+        if any(t in ("|", "||", ";", "&", "<", ">", ">>", "(", ")") for t in tokens) or "`" in part or "$" in part:
+            return False, "pipes, redirection, variables and substitutions are not allowed here"
+        if tuple(argv) in EXACT:  # fixed strings, safe as written
+            continue
+        free = len(argv) >= 2 and argv[0].endswith(".venv/bin/cheez") and (
+            argv[1] == "fail" or (len(argv) >= 3 and argv[-2] == "--market-only"))
+        for a in (argv[:-1] if free else argv):
+            if ARG_META.search(a):
+                return False, "globs, '..', redirection, pipes, variables and substitutions are not allowed here"
+        if tuple(argv) in EXACT:
+            continue
+        if argv and argv[0] in (".venv/bin/cheez", "./.venv/bin/cheez") and _cheez_args_ok(argv[1:]):
+            continue
+        return False, ("in the Cheez scheduled environment only the setup steps and `.venv/bin/cheez` commands "
+                       f"may run (blocked: {part[:80]!r})")
     return True, ""
 
 
-def _path_ok_for_write(path: str) -> bool:
-    repo = _repo()
-    p = os.path.realpath(path if os.path.isabs(path) else os.path.join(repo, path))
-    var = os.path.join(repo, "var") + os.sep
-    home = os.environ.get("CHEEZ_HOME")
-    allowed = [var] + ([os.path.realpath(home) + os.sep] if home else [])
-    scratch = os.environ.get("CLAUDE_SCRATCHPAD_DIR")
-    if scratch:
-        allowed.append(os.path.realpath(scratch) + os.sep)
-    if not any(p.startswith(a) for a in allowed):
-        return False
-    return os.path.splitext(p)[1].lower() in (".json", ".md", ".txt", ".html")
-
+# ------------------------------------------------------------------ decision
 
 def decide(tool: str, tool_input: dict, env: dict) -> tuple[bool, str]:
     blob = json.dumps(tool_input, ensure_ascii=False)
-    if MUTATING.search(blob):
-        return False, ("Cheez is read-only: this would call a Longbridge mutating method, an unsafe client or the "
-                       "broker API directly. Use the `cheez` commands, which only read.")
     if not lockdown(env):
+        # Development: only stop code that would actually call a mutating SDK method.
+        if tool == "Bash" and "python" in str(tool_input.get("command", "")) and MUTATING.search(blob):
+            return False, "Cheez is read-only: this would call a Longbridge mutating method or build a raw SDK client."
+        if tool in ("Write", "Edit", "MultiEdit"):
+            path = str(tool_input.get("file_path") or "")
+            rel = os.path.relpath(_resolve(path), _repo()) if path else ""
+            if rel.startswith("src" + os.sep) and MUTATING.search(blob):
+                return False, "Cheez source code may not call Longbridge mutating methods or build raw SDK clients."
         return True, ""
-    if BROKER_DIRECT.search(blob):
-        return False, "the agent may not contact the broker directly; `cheez prepare` reads the account"
+
+    if MUTATING.search(blob) or BROKER_DIRECT.search(blob):
+        return False, "the agent may not contact the broker directly; `cheez prepare` reads the account read-only"
     secrets = _secrets(env)
     if secrets and _contains_secret(blob, secrets):
         return False, "the brokerage credential must never appear in a tool call"
@@ -151,21 +201,21 @@ def decide(tool: str, tool_input: dict, env: dict) -> tuple[bool, str]:
         return _bash_ok(str(tool_input.get("command", "")))
     if tool in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
         path = str(tool_input.get("file_path") or tool_input.get("notebook_path") or "")
-        if not _path_ok_for_write(path):
-            return False, "in the Cheez scheduled environment, files may only be written under var/ (json, md, txt, html)"
+        if not path or ".." in path or not _inside(path, _roots(True)) or not _resolve(path).lower().endswith(DATA_EXT):
+            return False, "in the Cheez scheduled environment, only data files (json, md, txt, html) under var/ may be written"
         return True, ""
     if tool == "Read":
         path = str(tool_input.get("file_path", ""))
-        if re.search(r"(^|/)(proc|run|\.longbridge|\.ssh|\.ccr)(/|$)|\.env($|\.)|credentials|\.netrc", path):
-            return False, "reading process environment or credential files is not allowed"
+        if not path or not _inside(path, _roots(False)):
+            return False, "reading outside the repository and Claude's own working folders is not allowed here"
         return True, ""
     if tool in ("Grep", "Glob"):
-        path = str(tool_input.get("path", ""))
-        if re.search(r"(^|/)(proc|\.longbridge)(/|$)", path):
-            return False, "searching process or credential paths is not allowed"
+        path = str(tool_input.get("path") or _repo())
+        pattern = str(tool_input.get("glob") or "") + (str(tool_input.get("pattern") or "") if tool == "Glob" else "")
+        if ".." in pattern or pattern.startswith("/") or not _inside(path, _roots(False)):
+            return False, "searching outside the repository is not allowed here"
         return True, ""
     if tool.startswith("mcp__"):
-        # No connectors are needed for an edition; Artifact publishing is a built-in tool.
         return False, "connectors are disabled in the Cheez scheduled environment"
     return True, ""
 
@@ -178,7 +228,7 @@ def main() -> int:
     env = dict(os.environ)
     try:
         ok, reason = decide(str(payload.get("tool_name", "")), payload.get("tool_input") or {}, env)
-    except Exception as e:  # fail closed only where it matters
+    except Exception as e:
         ok, reason = (not lockdown(env)), f"guard error: {type(e).__name__}"
     if ok:
         return 0

@@ -22,8 +22,9 @@ from typing import Optional
 from ..models import Bar, Editorial, Ledger, LedgerEntry, LedgerOutcome, LedgerRevision, StockFacts
 
 
-def record_edition(ledger: Ledger, ed: Editorial, on: date, stocks: dict[str, StockFacts]) -> Ledger:
+def record_edition(ledger: Ledger, ed: Editorial, on: date, stocks: dict[str, StockFacts], revision: int = 1) -> Ledger:
     by_id = {e.idea_id: e for e in ledger.entries}
+    rev_tag = ed.edition_id if revision <= 1 else f"{ed.edition_id}#r{revision}"
     for idea in ed.ideas:
         target_id = idea.revision_of or idea.idea_id
         facts = stocks.get(idea.symbol.upper())
@@ -32,11 +33,13 @@ def record_edition(ledger: Ledger, ed: Editorial, on: date, stocks: dict[str, St
             px = (facts.last or facts.regular_close).value if (facts.last or facts.regular_close) else None
         if target_id in by_id:
             entry = by_id[target_id]
-            if any(r.edition_id == ed.edition_id for r in entry.revisions) or entry.edition_id == ed.edition_id:
-                continue  # idempotent: re-running an edition never duplicates a revision
+            if any(r.edition_id == rev_tag for r in entry.revisions) or entry.edition_id == rev_tag:
+                continue  # idempotent: re-rendering the same revision never duplicates anything
+            if entry.edition_id == ed.edition_id and revision > 1 and _same_levels(entry, idea):
+                continue  # a later revision that leaves this idea unchanged adds nothing
             entry.revisions.append(
                 LedgerRevision(
-                    edition_id=ed.edition_id,
+                    edition_id=rev_tag,
                     on=on,
                     action=idea.action,
                     entry_low=idea.entry.low if idea.entry else None,
@@ -66,6 +69,12 @@ def record_edition(ledger: Ledger, ed: Editorial, on: date, stocks: dict[str, St
         ledger.entries.append(entry)
         by_id[entry.idea_id] = entry
     return ledger
+
+
+def _same_levels(entry: LedgerEntry, idea) -> bool:
+    lo, hi, inv = _current_levels(entry)
+    return (idea.entry.low if idea.entry else None, idea.entry.high if idea.entry else None,
+            idea.invalidation.level if idea.invalidation else None) == (lo, hi, inv) and idea.action == entry.action
 
 
 def _current_levels(e: LedgerEntry) -> tuple[Optional[float], Optional[float], Optional[float]]:

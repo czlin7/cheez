@@ -181,6 +181,10 @@ def prepare(now: Optional[datetime] = None, *, trigger: str = "manual", force: b
                 revision=revision, prepared_at=now, market=market, stocks=stocks, portfolio=portfolio,
                 candidates=cands, problems=problems)
     d = store.edition_dir(eid)
+    for name in ("editorial.json", "validation.json"):  # never let a new revision reuse an old editorial
+        old = d / name
+        if old.exists():
+            old.replace(d / f"{old.stem}.superseded-{now:%Y%m%dT%H%M%S}{old.suffix}")
     (d / "pack.json").write_text(pack.model_dump_json())
     (d / "brief.md").write_text(write_brief(pack, st))
     st.runs.append(RunRecord(edition_id=eid, started_at=now, status="running", revision=revision,
@@ -322,7 +326,7 @@ def render(edition_id: str, *, closed: bool = False, market_only_reason: Optiona
 
     if editorial is not None:
         histories = {k: v.history for k, v in pack.stocks.items()}
-        ledger_mod.record_edition(st.ledger, editorial, pack.edition_date, pack.stocks)
+        ledger_mod.record_edition(st.ledger, editorial, pack.edition_date, pack.stocks, revision=pack.revision)
         ledger_mod.evaluate(st.ledger, histories, pack.edition_date)
 
     run = next((r for r in reversed(st.runs) if r.edition_id == edition_id and r.status == "running"), None)

@@ -180,3 +180,15 @@ def test_demo_is_separate_and_labelled(cheez_home):
     assert "Demonstration edition." in html
     assert re.search(r"fictional", html)
     assert not (cheez_home / "site" / "index.html").exists()  # live site untouched
+
+
+def test_forced_revision_never_reuses_the_previous_editorial(cheez_home, offline_pipeline):
+    from cheez import pipeline
+
+    res = pipeline.prepare(NOW)
+    _write_editorial(res)
+    pipeline.render(res.edition_id, now=NOW + timedelta(minutes=30))
+    res2 = pipeline.prepare(NOW + timedelta(hours=2), force=True)
+    assert not Path(res2.editorial_path).exists()
+    _, rep = pipeline.check(res2.edition_id)
+    assert not rep.ok

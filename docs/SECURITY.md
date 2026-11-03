@@ -78,12 +78,21 @@ hook. Claude Code runs it before every tool call; it is not part of the model.
 - **Always**: blocks any tool input that would call a Longbridge mutating
   method or build an unsafe client.
 - **Lockdown** (whenever a Longbridge credential is present in the
-  environment): the agent may run only `cheez` commands and a few read-only
-  utilities; may write only `.json/.md/.txt/.html` files under `var/`; may not
-  read `/proc`, credential files or the environment; may not contact the broker
-  directly; may not use connectors; and any tool call containing the
-  credential is blocked. So even a model misled by a malicious web page cannot
-  write and run its own brokerage code.
+  environment) switches to an allowlist. The agent may run only the setup
+  steps and `.venv/bin/cheez` with validated arguments: no `cd`, globs, `..`,
+  pipes, redirection, variables or other programs. It may read only inside
+  the repository and Claude's own working folders, and write only data files
+  (json, md, txt, html) under `var/`. Both checks use resolved paths, so
+  `/proc`, `/dev/fd` and symlink tricks do not work. It may not use
+  connectors or contact the broker directly, and any tool call containing the
+  credential is blocked. Even a model misled by a malicious web page cannot
+  write and run its own code, read the token, or change the guard.
+- The hook is registered as `python3 guard.py || exit 2`, so if the guard is
+  missing or crashes, the call is blocked rather than allowed.
+- An independent adversarial review on 3 Nov 2026 found and reproduced
+  bypasses in an earlier, denylist-style version (glob and `/dev/fd` reads of
+  the environment, `var/../` path traversal, module shadowing). All are fixed
+  and each one is now a regression test in `tests/test_readonly_boundary.py`.
 
 Repository settings and hooks apply to cloud sessions that use a single
 repository outside a Project, which is how the scheduled task is configured.

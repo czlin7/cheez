@@ -153,8 +153,9 @@ def main(out: Optional[Path] = None) -> int:
     print("Before generating it, untick everything except account access (and optionally trade/order lookup).")
     code = getpass.getpass("Agent Auth Code: ")
     tok = build_token_file(exchange(code))
-    out.parent.mkdir(parents=True, exist_ok=True)
+    out.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     fd = os.open(str(out), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    os.fchmod(fd, 0o600)  # also when the file already existed with wider permissions
     with os.fdopen(fd, "w") as fh:
         json.dump(tok, fh, separators=(",", ":"))
     print(f"Read-only scopes confirmed: {tok['scope']}.")

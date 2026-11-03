@@ -78,3 +78,19 @@ def test_ideas_expire_after_horizon(demo_world):
     later = date(2026, 11, 3) + timedelta(days=400)
     L.evaluate(led, {}, later)
     assert all(e.status == "expired" for e in led.entries)
+
+
+def test_forced_revision_records_changed_levels_as_a_revision(demo_world):
+    _, stocks, _ = demo_world
+    led = Ledger()
+    L.record_edition(led, _ed(), date(2026, 11, 3), stocks, revision=1)
+    ed2 = _ed()
+    nw = next(i for i in ed2.ideas if i.symbol == "NWSC")
+    nw.entry.low, nw.entry.high = 155.0, 162.0
+    L.record_edition(led, ed2, date(2026, 11, 3), stocks, revision=2)
+    L.record_edition(led, ed2, date(2026, 11, 3), stocks, revision=2)  # re-render: no duplicate
+    e = next(x for x in led.entries if x.symbol == "NWSC")
+    assert e.entry_low == 158.0 and [r.entry_low for r in e.revisions] == [155.0]
+    assert e.revisions[0].edition_id.endswith("#r2")
+    unchanged = next(x for x in led.entries if x.symbol == "HLDX")
+    assert unchanged.revisions == []

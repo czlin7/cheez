@@ -1,6 +1,6 @@
 """Local mock of Longbridge HTTP endpoints (read-only GETs) to observe SDK parsing/pagination.
 Mutating paths respond 403 and are logged so we can prove nothing mutating is called."""
-import json, sys, threading
+import json, os, sys, threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -101,5 +101,7 @@ if __name__ == "__main__":  # run as a separate process: the SDK holds the GIL d
     start(port)
     while True:
         time.sleep(0.2)
-        with open(logf, "w") as fh:
+        tmp = logf + ".tmp"
+        with open(tmp, "w") as fh:  # atomic replace: readers never see a half-written file
             json.dump(LOG, fh)
+        os.replace(tmp, logf)

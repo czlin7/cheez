@@ -25,8 +25,8 @@ Produce today's Cheez Daily edition. This is an unattended scheduled run: do not
 1. In the repository root run:
    git fetch origin claude/cheez-daily-briefing-1ce5zf && git checkout claude/cheez-daily-briefing-1ce5zf
    (skip this step if that branch no longer exists; then use main)
-2. Run: python3 -m venv .venv && . .venv/bin/activate && pip install -q -e '.[brokerage]'
-   Afterwards call every Cheez command as .venv/bin/cheez (shell state does not persist between commands).
+2. Run exactly: python3 -m venv .venv && .venv/bin/pip install -q -e '.[brokerage]'
+   Afterwards call every Cheez command as .venv/bin/cheez. Use the Read, Glob and Grep tools to read files.
 3. Follow .claude/skills/cheez-edition/SKILL.md exactly, with:
    - private page URL: <CHEEZ_ARTIFACT_URL>
    - trigger: scheduled (use `.venv/bin/cheez prepare --trigger scheduled --state-from <saved page path>`)

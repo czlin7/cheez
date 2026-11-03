@@ -1,0 +1,386 @@
+{#- Cheez Daily edition body. Rendered inside page.html.j2. -#}
+{%- macro status_glyph(s) -%}
+  {%- if s == "established" -%}<span class="status established"><svg class="sg" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="5" r="4" fill="currentColor"/></svg>Established</span>
+  {%- elif s == "developing" -%}<span class="status developing"><svg class="sg" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="5" r="3.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 1.4 A3.6 3.6 0 0 1 5 8.6 Z" fill="currentColor"/></svg>Developing</span>
+  {%- elif s == "hypothesis" -%}<span class="status hypothesis"><svg class="sg" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="5" r="3.6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2 1.6"/></svg>Hypothesis</span>
+  {%- else -%}<span class="status uncertain"><svg class="sg" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="5" r="3.6" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>Uncertain</span>{%- endif -%}
+{%- endmacro -%}
+{%- macro sources(list) -%}
+  {%- if list -%}<span class="srcs">{%- for s in list -%}<a href="{{ s.url }}" target="_blank" rel="noopener noreferrer">{{ s.publisher or s.title }}{% if s.published_at %} · {{ s.published_at[:10] }}{% endif %}</a>{%- endfor -%}</span>{%- endif -%}
+{%- endmacro -%}
+{%- macro quote_line(f) -%}
+  {%- if f and f.last -%}
+  <div class="quote-line">
+    <span><span class="px">{{ f.last.value | num(2) }} {{ f.currency }}</span> {{ f.change_pct_vs_close | change }}</span>
+    <span>{{ f.last | when }}</span>
+    {%- if f.last.session != "regular_close" and f.regular_close and f.regular_close.session == "regular_close" %}<span>Last close {{ f.regular_close.value | num(2) }}</span>{% endif -%}
+    {%- if f.next_earnings %}<span>Earnings {{ f.next_earnings | day("%-d %b") }} <span class="muted">({{ f.next_earnings_source }})</span></span>{% endif -%}
+    {%- if f.technicals.avg_dollar_volume_20d %}<span>Avg. traded {{ f.technicals.avg_dollar_volume_20d | big_money }}/day</span>{% endif -%}
+  </div>
+  {%- endif -%}
+{%- endmacro -%}
+
+<div class="wrap">
+  <header class="masthead" id="top">
+    <div class="eyebrow">
+      <span>{{ v.edition.kind_label }}</span>
+      <span>{{ v.edition.date | day("%A %-d %B %Y") }}</span>
+      {%- if v.edition.revision > 1 %}<span>Revision {{ v.edition.revision }}</span>{% endif %}
+      {%- if v.edition.demo %}<span class="chip rind">Demonstration</span>
+      {%- elif v.edition.status == "complete" %}<span class="chip ok">Complete</span>
+      {%- elif v.edition.status == "partial" %}<span class="chip warn">Partial data</span>
+      {%- elif v.edition.status == "closed" %}<span class="chip">Market closed</span>{% endif %}
+    </div>
+    <h1>{{ v.editorial.headline if v.editorial else v.edition.closed_headline }}</h1>
+    {%- if v.editorial %}<p class="dek">{{ v.editorial.dek }}</p>{% endif %}
+    <div class="meta-row">
+      <span>Published <b>{{ v.edition.published_at | london("%H:%M") }}</b> ({{ v.edition.published_at | newyork }})</span>
+      <span>Data cut-off <b>{{ v.edition.data_cutoff | london("%H:%M") }}</b></span>
+      <span>{{ v.session_text }}</span>
+      {%- if v.edition.read_minutes %}<span>{{ v.edition.read_minutes }}-minute read</span>{% endif %}
+    </div>
+    <div id="freshness" hidden></div>
+    {%- if v.edition.demo %}
+    <div class="banner demo" role="note"><span><strong>Demonstration edition.</strong> The portfolio, ideas and commentary on this page are fictional examples used to test Cheez. They are not about your account and not research to act on.</span></div>
+    {%- endif %}
+    {%- if v.edition.status == "partial" and v.edition.problems %}
+    <div class="banner warn" role="note"><span><strong>Partial data.</strong> {{ v.edition.problems | join(" ") }}</span></div>
+    {%- endif %}
+    {%- for note in v.session.notes %}
+    <div class="banner warn" role="note"><span>{{ note }}</span></div>
+    {%- endfor %}
+  </header>
+</div>
+
+{%- if v.editorial %}
+<section class="sec" id="brief" aria-labelledby="h-brief">
+  <div class="wrap">
+    <div class="sec-head"><h2 id="h-brief">The brief</h2><span class="aside">What matters, in order</span></div>
+    <div class="brief">
+      {%- for d in v.editorial.developments %}
+      <article class="dev">
+        <div class="rank" aria-hidden="true">{{ loop.index }}</div>
+        <div>
+          <h3>{{ d.title }}</h3>
+          <p class="body">{{ d.summary }}</p>
+          <p class="why"><b>Why it matters.</b> {{ d.why_it_matters }}</p>
+          {%- if d.uncertainty %}<p class="uncert"><b>Not yet known:</b> {{ d.uncertainty }}</p>{% endif %}
+          <div class="foot">{{ status_glyph(d.status) }}{{ sources(d.sources) }}</div>
+        </div>
+      </article>
+      {%- endfor %}
+    </div>
+    {%- if v.editorial.changes_since_last %}
+    <div class="changes">
+      <div class="eyebrow">Since the last edition{% if v.previous %} ({{ v.previous.date | day("%a %-d %b") }}){% endif %}</div>
+      <ul>{% for c in v.editorial.changes_since_last %}<li>{{ c }}</li>{% endfor %}</ul>
+    </div>
+    {%- endif %}
+  </div>
+</section>
+{%- endif %}
+
+<section class="sec" id="markets" aria-labelledby="h-markets">
+  <div class="wrap">
+    <div class="sec-head"><h2 id="h-markets">Markets</h2><span class="aside">Levels and changes with the session each comes from</span></div>
+    {%- if v.editorial %}
+    <p class="market-read prose">{{ v.editorial.market_read.summary }}</p>
+    {%- if v.editorial.market_read.attribution_caveat %}<p class="caveat">{{ v.editorial.market_read.attribution_caveat }}</p>{% endif %}
+    {%- endif %}
+    <div class="mkt-grid">
+      {%- for group, items in v.groups %}
+      <div class="mkt-group">
+        <h3>{{ group }}</h3>
+        <table class="mkt">
+          <thead><tr><th scope="col">Instrument</th><th scope="col">Level</th><th scope="col">Change</th></tr></thead>
+          <tbody>
+          {%- for i in items %}
+            <tr>
+              <td><span class="name">{{ i.label }}</span><span class="kind">{{ i.kind | kind_text }} · {{ i.last | when(i.exchange_tz) if i.last else "no data" }}</span>{% if i.stale %}<span class="kind stale-flag">Stale: {{ i.stale_reason }}</span>{% endif %}</td>
+              <td class="lvl">{{ i | inst_level }}</td>
+              <td class="chg">{{ i | inst_change }}<span class="basis">{{ i.change_basis or "" }}</span></td>
+            </tr>
+          {%- endfor %}
+          </tbody>
+        </table>
+      </div>
+      {%- endfor %}
+    </div>
+    {%- if v.editorial and v.editorial.market_read.notes %}
+    <h3 class="sub">Notes on the moves</h3>
+    <ul class="notes">{% for n in v.editorial.market_read.notes %}<li><b>{{ v.inst_labels.get(n.instrument_key, n.instrument_key) }}:</b> {{ n.comment }}</li>{% endfor %}</ul>
+    {%- endif %}
+    {%- if v.charts.hero %}
+    <div class="charts hero">
+      <figure class="chart"><figcaption>{{ v.charts.hero.title }} <span>{{ v.charts.hero.sub }}</span></figcaption>{{ v.charts.hero.svg | safe }}</figure>
+    </div>
+    {%- endif %}
+    {%- if v.charts.small %}
+    <div class="charts">
+      {%- for c in v.charts.small %}
+      <figure class="chart"><figcaption>{{ c.title }} <span>{{ c.sub }}</span></figcaption>{{ c.svg | safe }}</figure>
+      {%- endfor %}
+    </div>
+    {%- endif %}
+  </div>
+</section>
+
+{%- if v.editorial and v.editorial.featured %}
+<section class="sec" id="focus" aria-labelledby="h-focus">
+  <div class="wrap">
+    <div class="sec-head"><h2 id="h-focus">Stocks in focus</h2><span class="aside">Chosen on today's evidence, independent of your holdings</span></div>
+    <div class="focus-list">
+      {%- for s in v.editorial.featured %}
+      {%- set f = v.stocks.get(s.symbol.upper()) %}
+      <article class="stock">
+        <div class="stock-head">
+          <span class="ticker">{{ s.symbol }}</span>
+          <h3>{{ s.headline }}</h3>
+          {%- if v.held.get(s.symbol.upper()) %}<span class="chip">You hold this</span>{% endif %}
+          {%- if not s.is_new_since_last %}<span class="chip">Follow-up</span>{% endif %}
+        </div>
+        {%- if f %}<div class="small muted">{{ f.identity.name }}{% if f.identity.exchange %} · {{ f.identity.exchange }}{% endif %}</div>{% endif %}
+        {{ quote_line(f) }}
+        <p class="lede">{{ s.catalyst }}</p>
+        <dl class="kv">
+          <dt>Why it deserves attention</dt><dd>{{ s.why_attention }}</dd>
+          <dt>Our read</dt><dd>{{ s.interpretation }}</dd>
+        </dl>
+        <div class="foot small muted">{{ status_glyph(s.status) }} {{ sources(s.sources) }}</div>
+        {%- if s.read_throughs %}
+        <details class="more">
+          <summary>Read-through to {{ s.read_throughs | length }} related compan{{ "y" if s.read_throughs|length == 1 else "ies" }}</summary>
+          <div class="inner">
+            {%- for r in s.read_throughs %}
+            <div class="rt">
+              <div class="rt-head"><span class="ticker">{{ r.symbol }}</span><b>{{ r.name }}</b><span class="muted small">{{ r.relation | capitalize }}</span>{{ status_glyph(r.label) }}</div>
+              <div><b>Mechanism.</b> {{ r.mechanism }}</div>
+              <div><b>Materiality.</b> {{ r.materiality }}</div>
+              <div><b>Already in the price?</b> {{ r.priced_in }}</div>
+              {%- if r.sources %}<div class="small">{{ sources(r.sources) }}</div>{% endif %}
+            </div>
+            {%- endfor %}
+          </div>
+        </details>
+        {%- endif %}
+      </article>
+      {%- endfor %}
+    </div>
+  </div>
+</section>
+{%- endif %}
+
+{%- if v.editorial %}
+<section class="sec" id="ideas" aria-labelledby="h-ideas">
+  <div class="wrap">
+    <div class="sec-head"><h2 id="h-ideas">Decisions and ideas</h2><span class="aside">Long-only, cash account · research, not orders</span></div>
+    {%- if v.ideas %}
+    <div class="ideas">
+      {%- for it in v.ideas %}
+      {%- set i = it.idea %}{%- set d = it.derived %}{%- set f = it.facts %}
+      <article class="idea" id="idea-{{ i.idea_id }}">
+        <div class="idea-top">
+          <div class="rankno" aria-label="Rank {{ loop.index }}">{{ loop.index }}</div>
+          <div class="actline">
+            <span class="action{% if i.action in ['wait','watch','hold'] %} passive{% endif %}">{{ i.action | action_text }}</span>
+            <span class="ticker">{{ i.symbol }}</span>
+            <span class="chip">{{ i.horizon.label }}</span>
+            <span class="chip">{{ "Decision for today" if i.decision_today else "Not for today" }}</span>
+            <span class="chip {{ 'ok' if i.confidence == 'high' else 'warn' if i.confidence == 'low' else '' }}">{{ i.confidence | capitalize }} confidence</span>
+            {%- if d.held %}<span class="chip">You hold this</span>{% endif %}
+            {%- if i.revision_of %}<span class="chip rind">Revised view</span>{% endif %}
+          </div>
+          <h3>{{ i.thesis }}</h3>
+        </div>
+        <div class="idea-body">
+          {{ quote_line(f) }}
+          <dl class="kv">
+            <dt>Why now</dt><dd>{{ i.why_now }}</dd>
+            <dt>Catalyst</dt><dd>{{ i.catalyst }}</dd>
+            {%- if i.value_or_trap %}<dt>Value or trap?</dt><dd>{{ i.value_or_trap }}</dd>{% endif %}
+            {%- if i.revision_note %}<dt>What changed</dt><dd>{{ i.revision_note }}</dd>{% endif %}
+          </dl>
+          {%- if i.entry or i.invalidation %}
+          <div class="levels">
+            {%- if i.entry %}
+            <div class="level entry"><div class="lk">Entry zone</div><div class="lv num">{{ i.entry.low | num(2) }}–{{ i.entry.high | num(2) }}</div>
+              <div class="ln">{% if d.distance_to_zone_pct is not none %}Price is {{ d.distance_to_zone_pct | abs | pct }} {{ "above" if d.distance_to_zone_pct > 0 else "below" }} the zone midpoint{% endif %}</div></div>
+            {%- endif %}
+            {%- if i.invalidation %}
+            <div class="level inval"><div class="lk">Invalidation</div><div class="lv num">{{ i.invalidation.level | num(2) }}</div>
+              <div class="ln">{{ "Reassess the thesis" if i.invalidation.meaning == "reassess" else "Consider exiting" }}{% if d.downside_to_invalidation_pct is not none %} · {{ d.downside_to_invalidation_pct | abs | pct }} below the zone midpoint{% endif %}</div></div>
+            {%- endif %}
+            {%- for s in i.scenarios if s.target is not none %}
+            <div class="level"><div class="lk">{{ s.name }} · {{ s.horizon }}</div><div class="lv num">{{ s.target | num(2) }}</div><div class="ln">{{ s.rationale }}</div></div>
+            {%- endfor %}
+            {%- if d.reward_risk is not none %}
+            <div class="level"><div class="lk">Reward ÷ risk</div><div class="lv num">{{ "%.1f" | format(d.reward_risk) }}×</div><div class="ln">Computed, not forecast</div></div>
+            {%- endif %}
+          </div>
+          {%- endif %}
+          {%- if it.chart %}
+          <figure class="chart"><figcaption>{{ i.symbol }} daily close <span>{{ it.chart_range }}</span></figcaption>{{ it.chart | safe }}</figure>
+          {%- endif %}
+          {%- if i.conditions %}
+          <div><div class="eyebrow">Before acting</div><ul class="conds">{% for c in i.conditions %}<li>{{ c }}</li>{% endfor %}</ul></div>
+          {%- endif %}
+          <div class="counter"><b>Strongest case against</b>{{ i.counter_argument }}</div>
+          <dl class="kv">
+            <dt>Would change our view</dt><dd>{{ i.would_change_view }}</dd>
+            <dt>Confidence basis</dt><dd>{{ i.confidence_basis }}</dd>
+            {%- if it.feasibility %}<dt>Feasibility</dt><dd>{{ it.feasibility }}</dd>{% endif %}
+          </dl>
+          <details class="more">
+            <summary>{{ "How the levels were derived, costs and risks" if (i.entry or i.invalidation) else "Costs, risks and sources" }}</summary>
+            <div class="inner">
+              {%- if i.entry %}<div><b>Entry zone.</b> {{ i.entry.derivation }} <span class="muted small">Reference levels cited: {{ i.entry.basis | join(", ") }}.</span></div>{% endif %}
+              {%- if i.invalidation %}<div><b>Invalidation.</b> {{ i.invalidation.derivation }} {{ i.invalidation.gap_risk }}</div>{% endif %}
+              {%- if d.reward_risk_basis %}<div><b>Reward ÷ risk.</b> {{ d.reward_risk_basis }}</div>{% endif %}
+              {%- for s in i.scenarios if s.target is none %}<div><b>{{ s.name }} ({{ s.horizon }}).</b> {{ s.rationale }}</div>{% endfor %}
+              {%- if i.costs_and_risks %}<ul class="conds">{% for c in i.costs_and_risks %}<li>{{ c }}</li>{% endfor %}</ul>{% endif %}
+              <div class="small">{{ sources(i.sources) }}</div>
+            </div>
+          </details>
+          <p class="not-order">This is a conditional research idea, not an instruction to place an order. Cheez never places, changes or cancels orders. Levels are not guaranteed execution prices: prices can gap through them.</p>
+        </div>
+      </article>
+      {%- endfor %}
+    </div>
+    {%- endif %}
+    {%- if v.editorial.no_setup_statement %}
+    <div class="no-setup"{% if v.ideas %} style="margin-top:18px"{% endif %}><h3>{{ "No compelling setup today" if not v.ideas else "Nothing else clears the bar" }}</h3><p>{{ v.editorial.no_setup_statement }}</p></div>
+    {%- endif %}
+  </div>
+</section>
+{%- endif %}
+
+<section class="sec" id="portfolio" aria-labelledby="h-portfolio">
+  <div class="wrap">
+    <div class="sec-head"><h2 id="h-portfolio">Your portfolio</h2><span class="aside">{{ v.portfolio.aside }}</span></div>
+    {%- if not v.portfolio.available %}
+    <div class="pf-state">
+      <h3>{{ v.portfolio.title }}</h3>
+      <p>{{ v.portfolio.message }}</p>
+      <p class="small muted">The market report and ideas above do not depend on your holdings. Personalised conclusions are withheld until portfolio data is available and current.</p>
+    </div>
+    {%- else %}
+    {%- for av in v.portfolio.accounts %}
+    {%- if v.portfolio.accounts | length > 1 %}<h3 class="sub">{{ av.account.label }}</h3>{% endif %}
+    <div class="figures">
+      <div class="figure"><div class="fk">Net assets (broker)</div><div class="fv num">{{ av.broker_net_assets | money(av.base) }}</div><div class="fn">As reported by the broker</div></div>
+      <div class="figure"><div class="fk">Invested</div><div class="fv num">{{ av.invested_base | money(av.base) }}</div><div class="fn">{{ av.account.positions | length }} positions, valued by Cheez</div></div>
+      <div class="figure"><div class="fk">Largest position</div><div class="fv num">{{ av.top_weight_pct | pct }}</div><div class="fn">Top three {{ av.top3_weight_pct | pct }}</div></div>
+      <div class="figure"><div class="fk">Effective positions</div><div class="fv num">{{ "%.1f" | format(av.effective_positions) if av.effective_positions else "—" }}</div><div class="fn">1 ÷ sum of squared weights</div></div>
+    </div>
+    <div class="tablewrap">
+      <table class="data">
+        <thead><tr><th scope="col">Holding</th><th scope="col">Quantity</th><th scope="col">Price</th><th scope="col">Value ({{ av.base }})</th><th scope="col">Weight</th><th scope="col">vs broker avg. cost</th></tr></thead>
+        <tbody>
+        {%- for pv in av.positions %}
+          <tr>
+            <td><span class="ticker">{{ pv.position.ticker }}</span> <span class="small muted">{{ pv.position.name or "" }}</span></td>
+            <td>{{ pv.position.quantity | num(0) }}{% if pv.position.available_quantity is not none and pv.position.available_quantity != pv.position.quantity %} <span class="small muted">({{ pv.position.available_quantity | num(0) }} sellable)</span>{% endif %}</td>
+            <td>{{ pv.position.last_price | num(2) }} <span class="small muted">{{ pv.position.currency }}</span></td>
+            <td>{{ pv.value_base | money }}</td>
+            <td>{{ pv.weight_pct | pct }}{% if pv.weight_pct %}<span class="wbar" style="width:{{ [pv.weight_pct * 0.6, 60] | min }}px" aria-hidden="true"></span>{% endif %}</td>
+            <td>{{ pv.unrealised_pct | change("%", 1) }}</td>
+          </tr>
+        {%- endfor %}
+        </tbody>
+      </table>
+    </div>
+    <h3 class="sub">Cash by currency</h3>
+    <div class="tablewrap">
+      <table class="data">
+        <thead><tr><th scope="col">Currency</th><th scope="col">Cash balance</th><th scope="col">Available to trade (cash, not margin)</th></tr></thead>
+        <tbody>{% for ccy, bal, avail in av.cash_by_currency %}<tr><td>{{ ccy }}</td><td>{{ bal | money(None, 2) }}</td><td>{{ avail | money(None, 2) }}</td></tr>{% endfor %}</tbody>
+      </table>
+    </div>
+    {%- if av.account.open_orders %}
+    <h3 class="sub">Open orders (read-only view)</h3>
+    <div class="tablewrap"><table class="data"><thead><tr><th scope="col">Symbol</th><th scope="col" class="t">Side</th><th scope="col">Quantity</th><th scope="col">Filled</th><th scope="col">Limit</th><th scope="col" class="t">Status</th></tr></thead>
+      <tbody>{% for o in av.account.open_orders %}<tr><td>{{ o.symbol }}</td><td class="t">{{ o.side | capitalize }}</td><td>{{ o.quantity | num(0) }}</td><td>{{ o.executed_quantity | num(0) }}</td><td>{{ o.price | num(2) }}</td><td class="t">{{ o.status }}</td></tr>{% endfor %}</tbody></table></div>
+    {%- endif %}
+    <ul class="notes small" style="margin-top:14px">
+      <li>{{ av.performance_note }}</li>
+      {%- for iss in av.issues %}<li>{{ iss }}</li>{% endfor %}
+      <li>History retrieved: trades {{ av.account.executions_coverage.retrieved_from | day("%-d %b %Y") }} to {{ av.account.executions_coverage.retrieved_to | day("%-d %b %Y") }} ({{ av.account.executions_coverage.records }} fills); cash flows {{ av.account.cash_flows_coverage.retrieved_from | day("%-d %b %Y") }} to {{ av.account.cash_flows_coverage.retrieved_to | day("%-d %b %Y") }} ({{ av.account.cash_flows_coverage.records }} records).{% if av.account.executions_coverage.note %} {{ av.account.executions_coverage.note }}{% endif %}</li>
+    </ul>
+    {%- endfor %}
+    {%- for m in v.portfolio.messages %}<p class="small muted" style="margin-top:8px">{{ m }}</p>{% endfor %}
+    {%- if v.editorial and v.editorial.portfolio %}
+    <h3 class="sub">What today means for your holdings</h3>
+    <p class="prose">{{ v.editorial.portfolio.summary }}</p>
+    {%- if v.editorial.portfolio.holding_notes %}<ul class="notes" style="margin-top:10px">{% for n in v.editorial.portfolio.holding_notes %}<li><b>{{ n.instrument_key }}:</b> {{ n.comment }}</li>{% endfor %}</ul>{% endif %}
+    {%- if v.editorial.portfolio.fit_of_ideas %}<h3 class="sub">How today's ideas would fit</h3><ul class="notes">{% for n in v.editorial.portfolio.fit_of_ideas %}<li>{{ n }}</li>{% endfor %}</ul>{% endif %}
+    {%- endif %}
+    {%- endif %}
+  </div>
+</section>
+
+{%- if v.editorial and v.editorial.calendar %}
+<section class="sec" id="calendar" aria-labelledby="h-calendar">
+  <div class="wrap">
+    <div class="sec-head"><h2 id="h-calendar">Coming up</h2><span class="aside">Events that could move prices</span></div>
+    <div class="cal">
+      {%- for c in v.editorial.calendar %}
+      <div class="cal-row"><div class="when">{{ c.when }}</div><div><div>{{ c.what }}</div><div class="rel">{{ c.relevance }}{% if c.source %} · <a href="{{ c.source.url }}" target="_blank" rel="noopener noreferrer">{{ c.source.publisher or c.source.title }}</a>{% endif %}</div></div></div>
+      {%- endfor %}
+    </div>
+  </div>
+</section>
+{%- endif %}
+
+<section class="sec" id="record" aria-labelledby="h-record">
+  <div class="wrap">
+    <div class="sec-head"><h2 id="h-record">Idea record</h2><span class="aside">Every published idea, unedited, with what happened next</span></div>
+    {%- if v.ledger.entries %}
+    <div class="tablewrap">
+      <table class="data">
+        <thead><tr><th scope="col">Published</th><th scope="col" class="t">Idea</th><th scope="col">Zone</th><th scope="col">Invalidation</th><th scope="col">Zone touched</th><th scope="col">Since zone midpoint</th><th scope="col" class="t">Status</th></tr></thead>
+        <tbody>
+        {%- for e in v.ledger.entries %}
+          <tr>
+            <td>{{ e.first_published | day("%-d %b %Y") }}</td>
+            <td class="t"><span class="ticker">{{ e.symbol }}</span> {{ e.action | action_text }} · {{ e.horizon_label }}{% if e.revisions %} <span class="small muted">({{ e.revisions | length }} revision{{ "s" if e.revisions|length > 1 }})</span>{% endif %}</td>
+            <td>{% if e.entry_low %}{{ e.entry_low | num(2) }}–{{ e.entry_high | num(2) }}{% else %}—{% endif %}</td>
+            <td>{{ e.invalidation | num(2) }}</td>
+            <td>{{ e.outcome.zone_touched_on | day("%-d %b") if e.outcome and e.outcome.zone_touched_on else "Not yet" }}</td>
+            <td>{{ e.outcome.hypothetical_return_from_zone_mid_pct | change("%", 1) if e.outcome and e.outcome.hypothetical_return_from_zone_mid_pct is not none else "—" }}</td>
+            <td class="t">{{ e.status | replace("_", " ") | capitalize }}</td>
+          </tr>
+        {%- endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="small muted prose" style="margin-top:10px">{{ v.ledger.summary.caveat }} A zone touch means a later day's trading range overlapped the published zone; it is not a fill. These rows are published ideas, not trades in your account.</p>
+    {%- else %}
+    <p class="prose muted">No ideas have been published yet. Each idea will be recorded here with its original reasoning, levels and horizon, and later revisions will be added beneath it rather than overwriting it.</p>
+    {%- endif %}
+  </div>
+</section>
+
+<section class="sec" id="method" aria-labelledby="h-method">
+  <div class="wrap">
+    <div class="sec-head"><h2 id="h-method">Sources and method</h2><span class="aside">Run {{ v.run.status | replace("_", " ") }} · {{ v.edition.id }}</span></div>
+    <div class="method">
+      <p>Numbers in this edition come from code, not from the language model: price levels, changes, technical reference levels, earnings dates, portfolio arithmetic and reward ÷ risk are computed from the sources below. The model selects and explains developments, writes the ideas and cites its sources; every proposed price level is checked against the computed reference levels before publication. Coincident news is not treated as proof of why a market moved.</p>
+      <div class="tablewrap">
+        <table class="data srctable">
+          <thead><tr><th scope="col">Source</th><th scope="col" class="t">Status</th><th scope="col" class="t">Retrieved</th><th scope="col" class="t">Notes</th></tr></thead>
+          <tbody>
+          {%- for s in v.sources %}
+            <tr><td>{{ s.source }}</td><td class="t">{{ "OK" if s.ok else "Failed" }}{% if s.items %} · {{ s.items }} items{% endif %}</td><td class="t">{{ s.fetched_at | london("%-d %b %H:%M") }}</td><td class="t">{{ s.detail or "" }}</td></tr>
+          {%- endfor %}
+          </tbody>
+        </table>
+      </div>
+      <ul class="notes small">
+        {%- for n in v.method_notes %}<li>{{ n }}</li>{% endfor %}
+        {%- if v.editorial and v.editorial.research_notes %}<li>{{ v.editorial.research_notes }}</li>{% endif %}
+        {%- for c in (v.editorial.source_conflicts if v.editorial else []) %}<li><b>Sources disagreed on {{ c.topic }}.</b> {{ c.detail }} {{ c.resolution }}</li>{% endfor %}
+        {%- for w in v.warnings %}<li>Check: {{ w }}</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+</section>

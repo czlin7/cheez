@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cheez"
+version = "0.1.0"
+description = "Cheez Daily: a private, read-only market intelligence briefing."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+  "jinja2>=3.1",
+  "pydantic>=2.6",
+  "requests>=2.31",
+  "exchange_calendars>=4.5",
+  "pandas>=2.0",
+]
+
+[project.optional-dependencies]
+# Longbridge OpenAPI SDK. Only the read-only adapter in cheez.brokerage imports it.
+brokerage = ["longport>=3.0"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+cheez = "cheez.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+cheez = ["render/templates/*", "render/static/*", "editorial/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

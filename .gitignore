@@ -1,0 +1,29 @@
+# --- Private data: never commit (this repository is PUBLIC) ---
+# Generated editions, working files, caches and run state live here.
+/var/
+/output/
+/work/
+*.private.*
+*.local.json
+.env
+.env.*
+!.env.example
+# Broker statements/exports dropped in for the fallback importer
+/imports/
+*.statement.csv
+
+# --- Python ---
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+dist/
+
+# --- Tooling ---
+.DS_Store
+node_modules/
+/screenshots/

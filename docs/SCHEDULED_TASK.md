@@ -11,7 +11,7 @@ task itself, not in this public repository.
 | Schedule | `CRON_TZ=America/New_York 41 7 * * 1-5` (07:41 New York, weekdays) |
 | Session | A fresh session for each run |
 | Environment | `Cheez` once created (SETUP.md step 2); `Default` until then |
-| Connectors | None |
+| Connectors | None stored on the task. The repository also denies the Gmail, Drive, Calendar and Sheets connector tools. |
 | Notifications | Push on completion |
 | Model | Your account default; change in the task editor to trade quality for usage |
 
@@ -35,14 +35,27 @@ Produce today's Cheez Daily edition. This is an unattended scheduled run: do not
 Finish with the three-line report described in the skill.
 ```
 
-## Activating it
+## Current state and activation
 
-The task can only run once the code is on GitHub (scheduled runs clone the
-repository). If the task was created before that, or paused:
+The task **exists but is paused**. It was created on 3 Nov 2026, but two things
+prevent it from running:
 
-1. Make sure GitHub access works (claude.ai/connect-github) and the branch
-   `claude/cheez-daily-briefing-1ce5zf` exists on GitHub.
-2. claude.ai/code → Scheduled tasks → Cheez Daily → switch it on.
-3. Press **Run now** once. Today's edition already exists, so the run should
-   restore the page's state, report `duplicate` and stop. Open the run's
-   transcript to confirm it got that far without errors.
+- the code could not be pushed to GitHub (the Claude GitHub App has no write
+  access to `czlin7/cheez`), and
+- the tool that created it cannot attach a repository, and the repository
+  must be attached so that Cheez's hooks load at session start.
+
+To activate it:
+
+1. Fix GitHub access at <https://claude.ai/connect-github> (install the Claude
+   GitHub App on `czlin7/cheez`, or reconnect GitHub), then push the branch
+   `claude/cheez-daily-briefing-1ce5zf` (ask any Claude Code session on this
+   repository to push it, or push the git bundle from the build session).
+2. claude.ai/code → Scheduled tasks → **Cheez Daily** → Edit → add the
+   repository `czlin7/cheez` (as its only repository, outside a Project).
+   Check the schedule reads `CRON_TZ=America/New_York 41 7 * * 1-5`.
+3. Switch the task on.
+4. Press **Run now** once. If today's edition already exists, the run should
+   restore the page's state, report `duplicate` and stop; otherwise it
+   publishes a full edition. Open the run's transcript and the page to
+   confirm.

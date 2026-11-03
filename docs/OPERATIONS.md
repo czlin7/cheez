@@ -1,5 +1,9 @@
 # Running Cheez
 
+The scheduled task is named **Cheez Daily** (claude.ai/code → Scheduled
+tasks). As delivered it is paused until GitHub access is fixed and the
+repository is attached to it; see [SCHEDULED_TASK.md](SCHEDULED_TASK.md).
+
 ## What happens each weekday
 
 | New York | London (normal / clock-mismatch weeks) | Step |

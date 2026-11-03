@@ -46,13 +46,12 @@ SHELL_META = re.compile(r"[`<>;|]|\$\(|\$\{|\$[A-Za-z_]|&(?!&)")
 BASH_FORBIDDEN_WORDS = re.compile(
     r"\b(env|printenv|export|set|declare|eval|exec|source\s+/proc|curl|wget|nc|ncat|socat|ssh|scp|node|deno|bun|"
     r"perl|ruby|php|osascript|base64|xxd|openssl|python[0-9.]*\s+-c|python[0-9.]*\s+-(?!m\s)|bash\s+-c|sh\s+-c|zsh\s+-c)\b|"
-    r"/proc/|\.longbridge|\.ssh|\.credentials",
+    r"/proc/|/run/|\.longbridge|\.ssh|\.credentials|\.ccr|\.netrc|\.git-credentials|\.config/gh",
     re.I,
 )
 ALLOWED_COMMANDS = [
     re.compile(r"^(\./)?(\.venv/bin/)?cheez(\s+[\w@:/.,=+'\" -]*)?$"),
     re.compile(r"^(\.venv/bin/)?python[0-9.]*\s+-m\s+cheez(\s+[\w@:/.,=+'\" -]*)?$"),
-    re.compile(r"^(\.venv/bin/)?python[0-9.]*\s+-m\s+pytest(\s+[\w/.:=-]*)*$"),
     re.compile(r"^(uv\s+)?pip[0-9.]*\s+install\s+(-q\s+)?(-e\s+)?['\"]?\.(\[brokerage\])?['\"]?(\s+-q)?$"),
     re.compile(r"^(\.venv/bin/)?python[0-9.]*\s+-m\s+pip\s+install\s+(-q\s+)?(-e\s+)?['\"]?\.(\[brokerage\])?['\"]?(\s+-q)?$"),
     re.compile(r"^(uv\s+venv|python[0-9.]*\s+-m\s+venv)\s+\.venv(\s+-q)?$"),
@@ -60,7 +59,8 @@ ALLOWED_COMMANDS = [
     re.compile(r"^cd\s+[\w/.~-]+$"),
     re.compile(r"^git\s+(status|log|rev-parse|branch|diff)(\s+[\w/.:@^~-]*)*$"),
     re.compile(r"^git\s+(fetch|checkout|switch|pull)\s+(origin\s+)?[\w/.-]+(\s+[\w/.-]+)?$"),
-    re.compile(r"^(ls|pwd|date|wc|head|tail|cat|grep|find|stat|du|df|nproc|true)(\s+[\w/.:*=,+@%-]+)*$"),
+    # No `find` (its -exec runs programs) and no test runners: use the Glob and Grep tools instead.
+    re.compile(r"^(ls|pwd|date|wc|head|tail|cat|grep|stat|du|df|nproc|true)(\s+[\w/.:*=,+@%-]+)*$"),
     re.compile(r"^mkdir\s+-p\s+var/[\w/.-]+$"),
     re.compile(r"^cp\s+[\w/.@-]+\s+var/[\w/.-]+$"),
 ]
@@ -156,7 +156,7 @@ def decide(tool: str, tool_input: dict, env: dict) -> tuple[bool, str]:
         return True, ""
     if tool == "Read":
         path = str(tool_input.get("file_path", ""))
-        if re.search(r"(^|/)(proc|\.longbridge|\.ssh)(/|$)|\.env($|\.)|credentials", path):
+        if re.search(r"(^|/)(proc|run|\.longbridge|\.ssh|\.ccr)(/|$)|\.env($|\.)|credentials|\.netrc", path):
             return False, "reading process environment or credential files is not allowed"
         return True, ""
     if tool in ("Grep", "Glob"):

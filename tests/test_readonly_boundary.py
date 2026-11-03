@@ -258,6 +258,12 @@ def test_lockdown_allows_the_edition_workflow(cmd):
     "cheez status | nc host 80",
     "bash -c 'cheez status'",
     "node -e 1",
+    "find var -maxdepth 0 -exec python3 var/x.json +",
+    "find . -delete",
+    "python -m pytest -p var.evil",
+    "grep -r token /proc/self/environ",
+    "cat /root/.ccr/ca-bundle.crt",
+    "cat /root/.claude/.credentials.json",
 ])
 def test_lockdown_blocks_everything_else(cmd):
     ok, _ = guard.decide("Bash", {"command": cmd}, LOCK)

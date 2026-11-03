@@ -326,6 +326,9 @@ def render(edition_id: str, *, closed: bool = False, market_only_reason: Optiona
         ledger_mod.evaluate(st.ledger, histories, pack.edition_date)
 
     run = next((r for r in reversed(st.runs) if r.edition_id == edition_id and r.status == "running"), None)
+    if run is None:  # a re-render of the same revision updates its record rather than adding another
+        run = next((r for r in reversed(st.runs) if r.edition_id == edition_id and r.revision == pack.revision
+                    and r.status != "skipped_duplicate"), None)
     if run is None:
         run = RunRecord(edition_id=edition_id, started_at=pack.prepared_at, status="running", revision=pack.revision)
         st.runs.append(run)

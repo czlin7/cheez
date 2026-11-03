@@ -27,7 +27,15 @@
       "Bash(printenv*)",
       "Bash(env)",
       "Bash(curl *longbridge*)",
-      "Bash(curl *longport*)"
+      "Bash(curl *longport*)",
+      "mcp__Gmail__*",
+      "mcp__Google_Drive__*",
+      "mcp__Google_Calendar__*",
+      "mcp__Google_Sheets__*",
+      "mcp__claude_ai_Gmail__*",
+      "mcp__claude_ai_Google_Drive__*",
+      "mcp__claude_ai_Google_Calendar__*",
+      "mcp__claude_ai_Google_Sheets__*"
     ]
   }
 }

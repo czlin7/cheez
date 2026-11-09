@@ -129,12 +129,21 @@ class SourceStatus(Strict):
     items: int = 0
 
 
+class DisplayFx(Strict):
+    """Rates used only to annotate prices in the reader's chosen currency."""
+
+    per_usd: dict[str, float] = Field(default_factory=dict)  # 1 USD = rate CCY
+    as_of: Optional[datetime] = None
+    source: str = "Yahoo Finance"
+
+
 class MarketSnapshot(Strict):
     generated_at: datetime
     data_cutoff: datetime
     session: SessionContext
     instruments: list[Instrument] = Field(default_factory=list)
     sources: list[SourceStatus] = Field(default_factory=list)
+    display_fx: DisplayFx = Field(default_factory=DisplayFx)
     demo: bool = False
 
 
@@ -398,6 +407,8 @@ class Idea(Strict):
     action: ActionType
     decision_today: bool  # is this a decision worth considering today (vs. a watch item)
     horizon: Horizon
+    summary: Optional[str] = Field(None, max_length=200)  # one line for the playbook card: why this name, today
+    outlook: Optional[str] = Field(None, max_length=240)  # what we expect, conditionally, over the horizon
     thesis: str
     why_now: str
     catalyst: str
@@ -439,6 +450,7 @@ class Editorial(Strict):
     edition_id: str
     headline: str
     dek: str  # one-paragraph standfirst
+    tldr: list[str] = Field(default_factory=list, max_length=5)  # "In 30 seconds": the edition in 3-4 lines
     developments: list[Development] = Field(min_length=1, max_length=6)
     market_read: MarketRead
     changes_since_last: list[str] = Field(default_factory=list)

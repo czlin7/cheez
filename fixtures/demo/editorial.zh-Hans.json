@@ -1,0 +1,296 @@
+{
+ "edition_id": "REPLACED_AT_BUILD",
+ "headline": "示范：芯片供应疑虑缓解，消费类股持续走低",
+ "dek": "这是一份以合成数据与虚构公司制作的示范版。它展示 Cheez 如何安排一个早晨的内容：少数真正重要的发展、跨资产概览、两档值得关注的个股，以及附有价位、条件与反方论点的排序观点。",
+ "tldr": [
+  "Northwind（虚构）表示芯片封装交期再度缩短；股价在下跌 20% 后于盘前反弹。",
+  "必需消费品因销量停滞持续下跌：变便宜不等于更有价值。",
+  "交易清单：等待 Northwind 回落至 158–166，查看过大的 Harbourline 持仓，Meridian 续抱但不加仓。"
+ ],
+ "developments": [
+  {
+   "title": "一家虚构芯片商表示产能短缺正在缓解",
+   "summary": "Northwind Semiconductor（虚构）在示范研讨会上表示，其先进封装产线的交期连续第二个月缩短。股价自 9 月高点下跌 20% 后，今天盘前走高。",
+   "why_it_matters": "若产能正在放宽，原本限量供货的公司会失去部分定价能力，而等待芯片的客户可以出货更多。对设备供应商的影响，取决于缓解是来自添加设备还是需求转弱。",
+   "status": "developing",
+   "uncertainty": "公司没有提供订单数字，因此供应缓解也可能反映需求转弱，而非产能增加。",
+   "tickers": [
+    "NWSC",
+    "QRTZ"
+   ],
+   "sources": [
+    {
+     "title": "示范研讨会逐字稿",
+     "url": "https://example.com/demo/nwsc-conference",
+     "publisher": "示范来源",
+     "published_at": "2026-11-02",
+     "kind": "company"
+    }
+   ]
+  },
+  {
+   "title": "必需消费品因销量成长停滞而持续走弱",
+   "summary": "Meridian Consumer Brands（虚构）已自 52 周高点下跌约 26%。两家示范同业上周公布的销售量持平，成长完全来自涨价。",
+   "why_it_matters": "以涨价带动的成长，往往在消费者转向较便宜选择后消退。股价变便宜只有在销量稳定时才有帮助；在那之前，下跌可能反映的是未来获利降低，而非暂时性的卖压。",
+   "status": "established",
+   "tickers": [
+    "MRDN"
+   ],
+   "sources": [
+    {
+     "title": "示范同业财报摘要",
+     "url": "https://example.com/demo/staples-volumes",
+     "publisher": "示范来源",
+     "published_at": "2026-10-29",
+     "kind": "news"
+    }
+   ]
+  },
+  {
+   "title": "美债收益率在示范就业报告公布前小幅走高",
+   "summary": "合成的 10 年期收益率今晨小幅上升。虚构的就业报告将于周五公布。",
+   "why_it_matters": "收益率上升会提高长存续期成长股的折现率。单日变动幅度很小；未来一周的方向更重要。",
+   "status": "uncertain",
+   "sources": [
+    {
+     "title": "示范经济行事历",
+     "url": "https://example.com/demo/calendar",
+     "publisher": "示范来源",
+     "published_at": "2026-11-02",
+     "kind": "official"
+    }
+   ]
+  }
+ ],
+ "market_read": {
+  "summary": "合成的美股期货显示开盘平稳，欧洲涨跌互见，亚洲收低。跨资产走势与上述个股消息没有矛盾，但也没有提供佐证。",
+  "notes": [
+   {
+    "instrument_key": "es",
+    "comment": "期货在现货指数开盘前就会变动；其涨跌是相对于前一结算价，而非昨日指数收盘。"
+   },
+   {
+    "instrument_key": "ust10y",
+    "comment": "前一交易日的官方收盘收益率；下方的即时列是盘中替代指针。"
+   }
+  ],
+  "attribution_caveat": "与新闻同时发生的走势，并不能证明是新闻造成的。"
+ },
+ "changes_since_last": [
+  "第一期示范版：没有更早的版本可供比较。"
+ ],
+ "featured": [
+  {
+   "symbol": "NWSC",
+   "headline": "Northwind 公布产能更新后盘前反弹",
+   "catalyst": "管理层表示封装交期连续第二个月缩短（虚构）。",
+   "why_attention": "股价比 9 月高点低 20%，接近 10 月的波段低点，因此这次更新出现在市场预期已经下修的时点。",
+   "interpretation": "这番说法方向上有帮助，但内容单薄。没有订单数据，还无法区分是供应改善还是需求转弱。",
+   "is_new_since_last": true,
+   "status": "developing",
+   "read_throughs": [
+    {
+     "symbol": "QRTZ",
+     "name": "Quartzline Equipment（虚构）",
+     "relation": "supplier",
+     "mechanism": "Quartzline 销售封装设备。若 Northwind 增购设备，Quartzline 已入帐这些订单；若交期缩短是因需求放缓，未来的设备订单可能转弱。",
+     "materiality": "示范文档将 Northwind 列为前五大客户之一，因此无论哪种情况，这个关联都很重要。",
+     "priced_in": "Quartzline 股价几乎没动，显示投资人在等待它自己的订单数据。",
+     "label": "hypothesis",
+     "sources": [
+      {
+       "title": "示范供应商申报文档",
+       "url": "https://example.com/demo/qrtz-10k",
+       "publisher": "示范来源",
+       "kind": "filing"
+      }
+     ]
+    }
+   ],
+   "sources": [
+    {
+     "title": "示范研讨会逐字稿",
+     "url": "https://example.com/demo/nwsc-conference",
+     "publisher": "示范来源",
+     "published_at": "2026-11-02",
+     "kind": "company"
+    }
+   ]
+  }
+ ],
+ "ideas": [
+  {
+   "idea_id": "2026-11-03-NWSC",
+   "symbol": "NWSC",
+   "action": "consider_buying",
+   "decision_today": false,
+   "horizon": {
+    "label": "3–6 个月",
+    "min_days": 60,
+    "max_days": 180
+   },
+   "summary": "供应正在缓解，股价距高点已跌 20%；回落至 10 月低点会是比今天反弹更好的入场时机。",
+   "outlook": "若 11 月 19 日的财报确认订单健康，三个月内回到 50 日均线（约 $188）附近是合理的。",
+   "thesis": "回落至 10 月低点附近，可能为一家供应限制或正在缓解的企业提供更好的入场点。",
+   "why_now": "股价已自 9 月高点下跌约 20%，而公司自己的更新显示供应正在改善。等待价格进入区间，可避免追逐单日反弹。",
+   "catalyst": "11 月 19 日的财报应能显示订单是否支持产能方面的说法。",
+   "entry": {
+    "low": 158.0,
+    "high": 166.0,
+    "derivation": "区间从 20 日低点（165.92）稍下方，延伸到 7 月波段低点上方缺口的中段。10 月波段低点 170.62 是其上方最近的支撑；回到区间内，等于重新测试近期区间的底部，而非 9 月高点。",
+    "basis": [
+     "low_20d",
+     "swing_low:2026-10-15"
+    ]
+   },
+   "conditions": [
+    "价格以收盘价为准（不只是盘中）落在 158–166 之间。",
+    "11 月 19 日财报没有下修业绩指引；若财报先公布，之后再重新评估区间。",
+    "届时买卖价差维持正常（在此示范中，该股每日成交额约 $1.9bn）。"
+   ],
+   "invalidation": {
+    "level": 149.5,
+    "meaning": "reassess",
+    "derivation": "跌破 200 日均线（150.34）与 7 月波段低点（150.22）后，长期上升趋势将被破坏，这次回档看起来会更像趋势反转。",
+    "gap_risk": "财报后股价可能直接开在此价位之下，因此这是重新评估的点，而不是保证的出场价。"
+   },
+   "scenarios": [
+    {
+     "name": "基本情境",
+     "target": 188.0,
+     "horizon": "约 3 个月",
+     "rationale": "若财报确认供应缓解且订单没有转弱，股价回到 50 日均线。"
+    },
+    {
+     "name": "乐观情境",
+     "target": 210.0,
+     "horizon": "约 6 个月",
+     "rationale": "若订单加速，股价重新测试 9 月高点。"
+    }
+   ],
+   "costs_and_risks": [
+    "11 月 19 日的财报落在持有期间内，可能使股价朝任一方向大幅波动。",
+    "以港币现金买入美元计价股票，会增加换汇成本。",
+    "半导体股往往同涨同跌；这会增加既有的芯片敞口。"
+   ],
+   "counter_argument": "从外部看，交期缩短正是需求放缓的样子。如果客户下单减少，20% 的跌幅可能是下行周期的开始，而不是买进机会。",
+   "would_change_view": "出现订单下滑或 11 月 19 日下修业绩指引的证据；收盘跌破 149.50。",
+   "value_or_trap": "从高点下跌本身并不代表有价值。这里区分回档与陷阱的关键是订单数据；在财报公布前，这个区间只是有条件的入场点，并非认定股价便宜。",
+   "confidence": "moderate",
+   "confidence_basis": "公司自己的说法支持此论点，但关键证据（订单）尚未公布。",
+   "sources": [
+    {
+     "title": "示范研讨会逐字稿",
+     "url": "https://example.com/demo/nwsc-conference",
+     "publisher": "示范来源",
+     "kind": "company"
+    }
+   ]
+  },
+  {
+   "idea_id": "2026-11-03-HLDX",
+   "symbol": "HLDX",
+   "action": "consider_trimming",
+   "decision_today": true,
+   "horizon": {
+    "label": "本周内查看",
+    "min_days": 1,
+    "max_days": 10
+   },
+   "summary": "经过长期上涨，Harbourline 现在占示范账户一半以上。",
+   "outlook": "不做价格判断：问题在于单一公司应该在多大程度上左右账户的结果。",
+   "thesis": "单一持股现在占示范账户一半以上，因此账户的表现主要取决于一家公司。",
+   "why_now": "股价在稳定上涨后接近 52 周高点，因此这个仓位在没有任何决策的情况下，占账户的比重变大了。",
+   "catalyst": "没有公司事件即将发生；触发因素是集中度，而不是新闻。",
+   "conditions": [
+    "先决定你能接受的单一公司比重；在设置风险偏好之前，Cheez 不会建议仓位大小。",
+    "卖出前先确认此账户以外的税务状况，这是 Cheez 看不到的。"
+   ],
+   "scenarios": [],
+   "costs_and_risks": [
+    "卖出上涨中的股票，可能意味着放弃进一步的涨幅。",
+    "手续费与资本利得税会降低效益。"
+   ],
+   "counter_argument": "公司经营良好，也没有出问题。单纯为了平衡而减仓赢家，若趋势延续，可能降低报酬。",
+   "would_change_view": "如果你决定集中持股是刻意的安排，这就变成「持有」。",
+   "confidence": "moderate",
+   "confidence_basis": "集中度直接由账户计算；多少算太多，取决于 Cheez 尚未取得的偏好设置。",
+   "sources": [
+    {
+     "title": "示范账户快照",
+     "url": "https://example.com/demo/account",
+     "publisher": "示范来源",
+     "kind": "data"
+    }
+   ]
+  },
+  {
+   "idea_id": "2026-11-03-MRDN",
+   "symbol": "MRDN",
+   "action": "hold",
+   "decision_today": false,
+   "horizon": {
+    "label": "直到销量数据公布",
+    "min_days": 20,
+    "max_days": 90
+   },
+   "summary": "销量停滞，因此较低的股价可能反映的是较低的获利，而不是便宜货。",
+   "outlook": "在销量稳定之前，股价可能在 8 至 9 月低点附近区间整理。",
+   "thesis": "持有但不加仓：下跌看来是销量停滞所致，这会降低未来获利，因此较低的价格还不算便宜。",
+   "why_now": "股价接近 8 至 9 月的低点（约 33.6–34.0），也就是先前买盘入场的区域。",
+   "catalyst": "下一季的销量数据；同业对消费降级的评论。",
+   "conditions": [
+    "在考虑加仓之前，先观察销售量是否停止下滑。"
+   ],
+   "scenarios": [],
+   "costs_and_risks": [
+    "若 33.6 附近的低点失守，下一个参考位是 52 周低点 32.79。"
+   ],
+   "counter_argument": "拥有强势品牌的必需消费品公司，常在涨价效应满一年后恢复，而且股价已反映了大量利空。",
+   "would_change_view": "连续两季销量稳定，会让较低的价格更具吸引力；若下修业绩指引，出场的理由会更充分。",
+   "value_or_trap": "有价值陷阱的风险：股价较便宜，但原因（销量下滑）会直接降低获利。",
+   "confidence": "low",
+   "confidence_basis": "证据来自同业，而非 Meridian 本身。",
+   "sources": [
+    {
+     "title": "示范同业财报摘要",
+     "url": "https://example.com/demo/staples-volumes",
+     "publisher": "示范来源",
+     "kind": "news"
+    }
+   ]
+  }
+ ],
+ "no_setup_statement": null,
+ "portfolio": {
+  "summary": "示范账户的持股集中：Harbourline 占一半以上，其次是一档港股与 Meridian。现金分为美元与港币，只有美元现金能在不换汇的情况下买入美股。",
+  "holding_notes": [
+   {
+    "instrument_key": "HLDX",
+    "comment": "接近 52 周高点；是集中度的主要来源。"
+   },
+   {
+    "instrument_key": "MRDN",
+    "comment": "券商没有提供成本价，因此不显示损益。"
+   }
+  ],
+  "fit_of_ideas": [
+   "加入 Northwind 会为目前没有半导体敞口的账户增加此类敞口；若以新资金买入，也会降低 Harbourline 的比重。",
+   "Quartzline 那笔 55 的未成交买单高于目前股价；请确认它仍符合你的意图。"
+  ]
+ },
+ "calendar": [
+  {
+   "when": "2026-11-07 08:30 ET",
+   "what": "示范就业报告",
+   "relevance": "利率与成长股对劳动市场的意外变化很敏感。"
+  },
+  {
+   "when": "2026-11-19 after close",
+   "what": "Northwind 财报（虚构）",
+   "relevance": "检验观点 1 背后的产能论点。"
+  }
+ ],
+ "source_conflicts": [],
+ "research_notes": "示范内容：本页所有公司、数字与来源链接皆为虚构。"
+}

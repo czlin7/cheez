@@ -1,0 +1,135 @@
+{#- The emailed digest. Table layout and inline styles only: mail clients ignore <style>, scripts and SVG. -#}
+{%- set ink = "#111827" %}{%- set ink2 = "#4b5563" %}{%- set ink3 = "#6b7280" %}{%- set rule = "#e5e7eb" %}
+{%- set brand = "#f59e0b" %}{%- set brandink = "#92400e" %}{%- set brandwash = "#fef3c7" %}{%- set up = "#047857" %}{%- set down = "#b91c1c" %}
+{%- set font = "-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,'PingFang TC','PingFang SC','Microsoft JhengHei','Microsoft YaHei',sans-serif" %}
+{%- set mono = "'SF Mono',Menlo,Consolas,monospace" %}
+<!doctype html>
+<html lang="{{ html_lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>{{ subject }}</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f1;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">{{ v.editorial.dek | tx | striptags | truncate(140) }}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f1;">
+<tr><td align="center" style="padding:20px 10px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;background:#ffffff;border-radius:14px;overflow:hidden;font-family:{{ font }};color:{{ ink }};">
+
+  <tr><td style="background:#0f172a;padding:18px 24px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.3px;"><span style="display:inline-block;width:12px;height:12px;background:{{ brand }};border-radius:3px;margin-right:8px;vertical-align:middle;"></span>Cheez <span style="font-weight:400;color:#94a3b8;">Daily</span></td>
+      <td align="right" style="font-size:12px;color:#94a3b8;">{{ date_label }}</td>
+    </tr></table>
+  </td></tr>
+
+  <tr><td style="padding:26px 24px 6px;">
+    {%- if v.edition.demo %}<p style="margin:0 0 12px;padding:8px 10px;background:{{ brandwash }};border-radius:6px;font-size:12px;color:{{ brandink }};"><b>Demonstration edition.</b> Fictional companies and data.</p>{% endif %}
+    <h1 style="margin:0;font-size:24px;line-height:1.25;font-weight:700;letter-spacing:-0.3px;">{{ v.editorial.headline | tx }}</h1>
+    <p style="margin:12px 0 0;font-size:15px;line-height:1.55;color:{{ ink2 }};">{{ v.editorial.dek | tx }}</p>
+  </td></tr>
+
+  {%- if v.editorial.tldr %}
+  <tr><td style="padding:16px 24px 0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{{ brandwash }};border-radius:10px;"><tr><td style="padding:14px 16px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:{{ brandink }};">{{ "In 30 seconds" | ui }}</div>
+      {%- for t in v.editorial.tldr %}<p style="margin:8px 0 0;font-size:14px;line-height:1.5;">&#9656; {{ t | tx }}</p>{% endfor %}
+    </td></tr></table>
+  </td></tr>
+  {%- endif %}
+
+  <tr><td style="padding:26px 24px 4px;">
+    <div style="font-size:18px;font-weight:700;border-top:3px solid {{ brand }};padding-top:10px;">{{ "Today's playbook" | ui }}</div>
+  </td></tr>
+  {%- for c in v.playbook.cards %}{%- set i = c.idea %}{%- set f = c.facts %}{%- set ccy = f.currency if f else "USD" %}
+  <tr><td style="padding:10px 24px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid {{ rule }};border-radius:10px;border-top:4px solid {{ up if i.action in ['consider_buying','consider_adding'] else down if i.action in ['consider_trimming','consider_exiting'] else '#d1d5db' }};">
+      <tr><td style="padding:14px 16px 4px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+          <td style="font-family:{{ mono }};font-size:17px;font-weight:700;">{{ c.rank }}. {{ i.symbol }}</td>
+          <td align="right"><span style="display:inline-block;padding:3px 8px;border-radius:5px;background:#f3f4f6;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">{{ i.action | action_text }}</span></td>
+        </tr></table>
+        {%- if f and f.identity.name %}<div style="font-size:12px;color:{{ ink3 }};">{{ f.identity.name }}</div>{% endif %}
+      </td></tr>
+      {%- if f and f.last %}
+      <tr><td style="padding:6px 16px 0;">
+        <span style="font-size:22px;font-weight:700;">{{ f.last.value | px(ccy) }}</span> <span style="font-size:12px;color:{{ ink3 }};">{{ ccy }}</span>
+        <span style="font-size:14px;font-weight:600;color:{{ up if (f.change_pct_vs_close or 0) >= 0 else down }};">&nbsp;{{ "%+.2f" | format(f.change_pct_vs_close or 0) }}%</span>
+        <div style="font-family:{{ mono }};font-size:15px;letter-spacing:-1px;color:{{ up if (f.technicals.return_3m_pct or 0) >= 0 else down }};margin-top:4px;" aria-hidden="true">{{ c.spark_text }}</div>
+        <div style="font-size:11px;color:{{ ink3 }};">{{ "3-month daily close" | ui }} · 1M {{ "%+.1f" | format(f.technicals.return_1m_pct or 0) }}% · 3M {{ "%+.1f" | format(f.technicals.return_3m_pct or 0) }}%</div>
+      </td></tr>
+      {%- endif %}
+      <tr><td style="padding:10px 16px 0;font-size:14px;line-height:1.5;"><b style="font-size:11px;letter-spacing:0.8px;text-transform:uppercase;color:{{ ink3 }};">{{ "Why" | ui }}</b><br>{{ c.why | tx }}</td></tr>
+      {%- if c.outlook %}<tr><td style="padding:8px 16px 0;font-size:14px;line-height:1.5;color:{{ ink2 }};"><b style="font-size:11px;letter-spacing:0.8px;text-transform:uppercase;color:{{ ink3 }};">{{ "Outlook" | ui }}</b><br>{{ c.outlook | tx }}</td></tr>{% endif %}
+      {%- if i.entry or i.invalidation %}
+      <tr><td style="padding:10px 16px 14px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" style="font-size:13px;"><tr>
+          {%- if i.entry %}<td style="padding:6px 10px;border-left:3px solid {{ up }};background:#f9fafb;"><span style="color:{{ ink3 }};font-size:11px;">{{ "Entry zone" | ui }}</span><br><b>{{ i.entry.low | px(ccy) }}–{{ i.entry.high | px(ccy) }}</b></td><td width="6"></td>{% endif %}
+          {%- if i.invalidation %}<td style="padding:6px 10px;border-left:3px solid {{ down }};background:#f9fafb;"><span style="color:{{ ink3 }};font-size:11px;">{{ "Invalidation" | ui }}</span><br><b>{{ i.invalidation.level | px(ccy) }}</b></td><td width="6"></td>{% endif %}
+          {%- if c.target is not none %}<td style="padding:6px 10px;border-left:3px solid {{ brand }};background:#f9fafb;"><span style="color:{{ ink3 }};font-size:11px;">{{ "Target" | ui }}</span><br><b>{{ c.target | px(ccy) }}</b></td>{% endif %}
+        </tr></table>
+      </td></tr>
+      {%- else %}<tr><td style="padding:0 16px 14px;"></td></tr>{% endif %}
+    </table>
+  </td></tr>
+  {%- else %}
+  <tr><td style="padding:10px 24px;font-size:14px;line-height:1.5;"><b>{{ "No trade today" | ui }}.</b> {{ v.editorial.no_setup_statement | tx }}</td></tr>
+  {%- endfor %}
+  <tr><td style="padding:2px 24px 0;font-size:11px;color:{{ ink3 }};">{{ "Conditional research plans, not orders. Levels are not guaranteed prices: markets can gap through them." | ui }}</td></tr>
+
+  {%- if v.pulse %}
+  <tr><td style="padding:26px 24px 4px;"><div style="font-size:18px;font-weight:700;border-top:1px solid {{ rule }};padding-top:12px;">{{ "Markets" | ui }}</div></td></tr>
+  <tr><td style="padding:4px 24px 0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;">
+      {%- for p in v.pulse %}
+      <tr>
+        <td style="padding:6px 0;border-bottom:1px solid {{ rule }};">{{ p.label }}</td>
+        <td align="right" style="padding:6px 0;border-bottom:1px solid {{ rule }};font-weight:600;">{{ p.inst | inst_level }}</td>
+        <td align="right" style="padding:6px 0 6px 10px;border-bottom:1px solid {{ rule }};color:{{ up if ((p.inst.change_bp if p.inst.kind == 'yield' else p.inst.change_pct) or 0) >= 0 else down }};">{% if p.inst.kind == "yield" %}{{ "%+.0f" | format(p.inst.change_bp or 0) }} bp{% else %}{{ "%+.2f" | format(p.inst.change_pct or 0) }}%{% endif %}</td>
+        <td align="right" style="padding:6px 0 6px 10px;border-bottom:1px solid {{ rule }};font-family:{{ mono }};letter-spacing:-1px;color:{{ ink3 }};" aria-hidden="true">{{ p.spark_text }}</td>
+      </tr>
+      {%- endfor %}
+    </table>
+    <p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:{{ ink2 }};">{{ v.editorial.market_read.summary | tx }}</p>
+  </td></tr>
+  {%- endif %}
+
+  <tr><td style="padding:26px 24px 4px;"><div style="font-size:18px;font-weight:700;border-top:1px solid {{ rule }};padding-top:12px;">{{ "The brief" | ui }}</div></td></tr>
+  {%- for d in v.editorial.developments %}
+  <tr><td style="padding:10px 24px 0;">
+    <div style="font-size:15px;font-weight:700;line-height:1.35;"><span style="color:{{ brandink }};">{{ loop.index }}.</span> {{ d.title | tx }}</div>
+    <p style="margin:4px 0 0;font-size:14px;line-height:1.55;">{{ d.summary | tx }}</p>
+    <p style="margin:4px 0 0;font-size:14px;line-height:1.55;color:{{ ink2 }};"><b>{{ "Why it matters." | ui }}</b> {{ d.why_it_matters | tx }}</p>
+  </td></tr>
+  {%- endfor %}
+
+  {%- if v.editorial.calendar %}
+  <tr><td style="padding:26px 24px 4px;"><div style="font-size:18px;font-weight:700;border-top:1px solid {{ rule }};padding-top:12px;">{{ "Coming up" | ui }}</div></td></tr>
+  <tr><td style="padding:4px 24px 0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;">
+      {%- for c in v.editorial.calendar %}<tr><td valign="top" style="padding:6px 10px 6px 0;color:{{ ink3 }};white-space:nowrap;border-bottom:1px solid {{ rule }};">{{ c.when }}</td><td style="padding:6px 0;border-bottom:1px solid {{ rule }};">{{ c.what | tx }}</td></tr>{% endfor %}
+    </table>
+  </td></tr>
+  {%- endif %}
+
+  {%- if include_portfolio and v.editorial.portfolio %}
+  <tr><td style="padding:26px 24px 4px;"><div style="font-size:18px;font-weight:700;border-top:1px solid {{ rule }};padding-top:12px;">{{ "Your portfolio" | ui }}</div>
+    <p style="margin:8px 0 0;font-size:14px;line-height:1.55;">{{ v.editorial.portfolio.summary | tx }}</p></td></tr>
+  {%- endif %}
+
+  {%- if page_url %}
+  <tr><td align="center" style="padding:28px 24px 8px;">
+    <a href="{{ page_url }}" style="display:inline-block;background:#111827;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 22px;border-radius:999px;">{{ "Full reasoning" | ui }} →</a>
+  </td></tr>
+  {%- endif %}
+
+  <tr><td style="padding:24px;font-size:11px;line-height:1.5;color:{{ ink3 }};border-top:1px solid {{ rule }};">
+    Cheez Daily is a private research briefing, not investment advice. It never places or changes orders. Data cut-off {{ v.edition.data_cutoff | local("%H:%M") }}; market data delayed as labelled.
+    {%- if v.market.display_fx.per_usd | length > 1 and v.market.display_fx.as_of %} Converted prices (≈) use rates as of {{ v.market.display_fx.as_of | local("%H:%M") }} and are approximate.{% endif %}
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>

@@ -1,5 +1,5 @@
 {%- if document %}<!doctype html>
-<html lang="en-GB">
+<html lang="{{ html_lang }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -7,9 +7,10 @@
 {%- endif %}
 <title>{{ title }}</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<link rel="icon" href="data:image/svg+xml,{{ logo | urlencode }}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Public+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap">
 <style>
 {%- if document %}
 :root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
@@ -22,30 +23,65 @@ img { max-width: 100%; }
 </head>
 <body>
 {%- endif %}
+<a class="skip" href="#edition">Skip to the edition</a>
 <div class="edbar">
   <div class="wrap">
     <a class="wordmark" href="{{ home_href }}" aria-label="Cheez Daily, latest edition">
-      <svg viewBox="0 0 18 16" aria-hidden="true"><path d="M1 13.5 L9 2 L17 13.5 Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="8" cy="10" r="1.5" fill="var(--rind)"/><circle cx="11.2" cy="11.6" r="0.9" fill="var(--rind)"/></svg>
-      Cheez <span class="daily">Daily</span>
+      <span class="mark" aria-hidden="true">{{ logo | safe }}</span>
+      <span>Cheez</span><span class="daily">Daily</span>
     </a>
     <nav aria-label="Sections">
-      {%- if has_editorial %}<a href="#brief">Brief</a>{% endif %}
-      <a href="#markets">Markets</a>
-      {%- if has_featured %}<a href="#focus">In focus</a>{% endif %}
-      {%- if has_editorial %}<a href="#ideas">Ideas</a>{% endif %}
-      <a href="#portfolio">Portfolio</a>
-      <a href="#record">Record</a>
-      {%- if archive is not none %}<a href="#archive">Archive</a>{% endif %}
+      {%- if has_editorial %}<a href="#playbook">{{ "Playbook" | ui }}</a><a href="#brief">{{ "Brief" | ui }}</a>{% endif %}
+      <a href="#markets">{{ "Markets" | ui }}</a>
+      {%- if has_featured %}<a href="#focus">{{ "In focus" | ui }}</a>{% endif %}
+      {%- if has_editorial %}<a href="#ideas">{{ "Ideas" | ui }}</a>{% endif %}
+      <a href="#portfolio">{{ "Portfolio" | ui }}</a>
+      <a href="#record">{{ "Record" | ui }}</a>
+      {%- if archive is not none %}<a href="#archive">{{ "Archive" | ui }}</a>{% endif %}
     </nav>
+    <button type="button" class="iconbtn" id="open-settings" aria-haspopup="dialog" aria-controls="settings" title="Settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="16" cy="7" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="17" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+      <span class="sr-only">{{ "Settings" | ui }}</span>
+    </button>
   </div>
 </div>
-<main id="edition" data-next-expected="{{ next_expected }}" data-edition="{{ edition_id }}">
+<dialog id="settings" class="settings" aria-labelledby="h-settings">
+  <form method="dialog">
+    <h2 id="h-settings">{{ "Settings" | ui }}</h2>
+    {%- if langs | length > 1 %}
+    <fieldset>
+      <legend>{{ "Language" | ui }}</legend>
+      <div class="seg" role="radiogroup">
+        {%- for code, name in langs %}<label><input type="radio" name="lang" value="{{ code }}"{% if code == lang %} checked{% endif %}><span>{{ name }}</span></label>{% endfor %}
+      </div>
+    </fieldset>
+    {%- endif %}
+    <fieldset>
+      <legend>{{ "Also show prices in" | ui }}</legend>
+      <select name="fx" aria-label="Currency">
+        <option value=""{% if not convert_to %} selected{% endif %}>{{ "Off" | ui }}</option>
+        {%- for c in currencies %}<option value="{{ c }}"{% if c == convert_to %} selected{% endif %}>{{ c }}</option>{% endfor %}
+      </select>
+      <p class="hint">{{ "Conversions are approximate, at the rates shown, and for reading only." | ui }}</p>
+    </fieldset>
+    <fieldset>
+      <legend>{{ "Theme" | ui }}</legend>
+      <div class="seg" role="radiogroup">
+        <label><input type="radio" name="theme" value="" checked><span>{{ "Auto" | ui }}</span></label>
+        <label><input type="radio" name="theme" value="light"><span>{{ "Light" | ui }}</span></label>
+        <label><input type="radio" name="theme" value="dark"><span>{{ "Dark" | ui }}</span></label>
+      </div>
+    </fieldset>
+    <div class="actions"><button value="done" class="btn">{{ "Done" | ui }}</button></div>
+  </form>
+</dialog>
+<main id="edition" data-next-expected="{{ next_expected }}" data-edition="{{ edition_id }}" data-lang="{{ lang }}" data-fx="{{ convert_to }}">
 {{ body | safe }}
 </main>
 {%- if archive is not none %}
 <section class="sec" id="archive" aria-labelledby="h-archive">
   <div class="wrap">
-    <div class="sec-head"><h2 id="h-archive">Archive</h2><span class="aside">Every edition, newest first. Opens in place.</span></div>
+    <div class="sec-head"><h2 id="h-archive">{{ "Archive" | ui }}</h2><span class="aside">Every edition, newest first. Opens in place.</span></div>
     {%- if archive %}
     <ul class="archive-list">
       {%- for a in archive %}
@@ -60,6 +96,7 @@ img { max-width: 100%; }
 {%- endif %}
 <footer class="colophon">
   <div class="wrap">
+    <div class="colo-brand"><span class="mark" aria-hidden="true">{{ logo | safe }}</span><b>Cheez Daily</b></div>
     <span>Cheez Daily is a private research briefing generated for one reader. It is not investment advice, it never places or changes orders, and it does not know your circumstances outside the connected account.</span>
     <span>Market data: Yahoo Finance (incl. ICE and CME data), Nasdaq.com — delayed as labelled, informational only, not for trading or redistribution. Official data: U.S. Department of the Treasury. Portfolio data, when connected: Longbridge, read-only.</span>
     <span>Edition {{ edition_id }} · generated {{ generated }}.</span>

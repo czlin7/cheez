@@ -1,22 +1,23 @@
 # Running Cheez
 
 The scheduled task is named **Cheez Daily** (claude.ai/code → Scheduled
-tasks). As delivered it is paused until GitHub access is fixed and the
-repository is attached to it; see [SCHEDULED_TASK.md](SCHEDULED_TASK.md).
+tasks). How to create or change it: [SCHEDULING.md](SCHEDULING.md).
 
-## What happens each weekday
+## What happens each weekday (default settings)
 
-| New York | London (normal / clock-mismatch weeks) | Step |
+| London | New York | Step |
 |---|---|---|
-| 07:41 | 12:41 / 11:41 | The scheduled task starts a fresh cloud session on this repository. |
-| 07:42 | | It installs Cheez, reads the private Cheez Daily page to restore the ledger, archive and run log, and runs `cheez prepare`. |
-| 07:43 | | Code fetches markets, the trading calendar, movers, earnings, stock facts and (if connected) the read-only Longbridge snapshot, and writes a research brief. |
-| 07:45–08:15 | | Claude researches and writes the editorial (bounded: about 25 searches and 25 page fetches). |
-| ~08:15 | ~13:15 / 12:15 | `cheez check` validates it (up to 3 attempts), `cheez render` builds the page, and it is published to the same private URL. You get a push notification when the run finishes. |
-| 09:30 | 14:30 / 13:30 | US regular session opens. |
+| 06:20 | 01:20 | The scheduled task starts a fresh cloud session on this repository. |
+| 06:21 | | It installs Cheez, reads the private page to restore the ledger, archive and run log, and runs `cheez prepare`. |
+| 06:22 | | Code fetches markets (US close, overnight futures, Asian close), the trading calendar, movers, earnings, stock facts, display FX rates and (if connected) the read-only Longbridge snapshot, and writes a research brief. |
+| 06:25–06:55 | | The agent researches and writes the editorial and its translations (bounded: about 25 searches and 25 page fetches). |
+| ~07:00 | 02:00 | `cheez check` validates it (up to 3 attempts), `cheez render` builds the page, it is published to the same private URL and, if enabled, emailed. You get a push notification when the run finishes. |
+| 08:00 | 03:00 | European markets open. |
+| 14:30 | 09:30 | US regular session opens (13:30 London in the weeks when US and UK clocks are out of step; the masthead says so). |
 
-On NYSE holidays the run publishes a short market-closed note instead. On
-early-close days the masthead says so.
+The delivery time and timezone are settings (CONFIGURATION.md). On NYSE
+holidays the run publishes a short market-closed note instead. On early-close
+days the masthead says so.
 
 ## Reading it
 
@@ -39,8 +40,8 @@ outcome.
 - **From the claude.ai scheduled-task page** (claude.ai/code → Scheduled
   tasks → Cheez Daily → **Run now**). If today's edition already exists the run
   stops without publishing anything (idempotent).
-- **For a revision** of today's edition (for example after an 08:30 data
-  release), start a Claude Code session on this repository and say:
+- **For a revision** of today's edition (for example after the 08:30 New York
+  data release, 13:30 London, or for fresher pre-market prices before the open), start a Claude Code session on this repository and say:
   "Produce a Cheez Daily revision for today using the cheez-edition skill,
   with `--force`, and publish to <your artifact URL>." The page then says
   "Revision 2".
@@ -48,8 +49,8 @@ outcome.
 ## Pause, resume, change the time
 
 On the scheduled-task page: the on/off switch pauses it; **Edit** changes the
-prompt, schedule, environment or model. To move the start time, keep the
-`CRON_TZ=America/New_York` prefix and change only the minute and hour.
+prompt, schedule, environment or model. To move the delivery time, change
+`[schedule]` in your settings and paste the cron line from `cheez schedule`.
 
 ## Check status
 
@@ -76,14 +77,16 @@ prompt, schedule, environment or model. To move the start time, keep the
 | Editions, ledger, run log, archive | The private Cheez Daily artifact (and its version history) |
 | Working files during a run | `var/` inside the cloud session (gitignored, deleted with the session) |
 | Longbridge token | The cloud environment variable `CHEEZ_LONGBRIDGE_OAUTH` |
+| Your settings | `cheez.toml` locally (gitignored); `CHEEZ_CONFIG_TOML` in the cloud environment |
+| Email secret | `CHEEZ_SMTP_PASSWORD` / `CHEEZ_RESEND_API_KEY`, or a network secret for `api.resend.com` |
 
 ## Local development
 
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
 pip install -e '.[brokerage,dev]'
-python -m pytest -q          # the full suite, no network needed except one live-data-free mock test
-cheez demo                   # fictional demonstration edition → var/demo/site-demo/cheez-daily.html
+python -m pytest -q          # the full suite, no network needed
+cheez demo                   # fictional demonstration edition → var/demo/site-demo/cheez-daily.html (+ email.html)
 node scripts/screenshot.cjs var/demo/site-demo/cheez-daily.html screenshots/   # phone/laptop, light/dark
 ```
 
@@ -94,6 +97,7 @@ cheez prepare --trigger manual        # facts + brief (var/editions/<id>/brief.m
 # write var/editions/<id>/editorial.json (see the skill)
 cheez refresh                         # optional: re-fetch prices if research took long
 cheez check && cheez render           # page → var/site/index.html
+cheez email                           # optional: email preview → var/site/email.html (--send to deliver)
 ```
 
 ## Maintenance

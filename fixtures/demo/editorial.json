@@ -2,6 +2,11 @@
  "edition_id": "REPLACED_AT_BUILD",
  "headline": "Demo: chip supply worries ease while consumer names keep sliding",
  "dek": "This is a demonstration edition built from synthetic data and fictional companies. It shows how Cheez lays out a morning: the few developments that matter, a cross-asset check, two stocks worth attention, and ranked ideas with their levels, conditions and counter-arguments.",
+ "tldr": [
+  "Northwind (fictional) says chip-packaging lead times shortened again; the shares bounce pre-market after a 20% slide.",
+  "Consumer staples keep falling as volumes stall: cheaper is not yet better value.",
+  "Playbook: wait for Northwind to pull back to 158–166, review the oversized Harbourline position, hold Meridian without adding."
+ ],
  "developments": [
   {
    "title": "A fictional chipmaker says its capacity shortage is easing",
@@ -9,30 +14,65 @@
    "why_it_matters": "If capacity is loosening, the companies that were rationing supply lose some pricing power, while customers that were waiting for chips can ship more. The effect on equipment suppliers depends on whether the easing comes from new tools or from weaker demand.",
    "status": "developing",
    "uncertainty": "The company gave no numbers for orders, so easing supply could reflect softer demand rather than added capacity.",
-   "tickers": ["NWSC", "QRTZ"],
-   "sources": [{"title": "Demo conference transcript", "url": "https://example.com/demo/nwsc-conference", "publisher": "Demo source", "published_at": "2026-11-02", "kind": "company"}]
+   "tickers": [
+    "NWSC",
+    "QRTZ"
+   ],
+   "sources": [
+    {
+     "title": "Demo conference transcript",
+     "url": "https://example.com/demo/nwsc-conference",
+     "publisher": "Demo source",
+     "published_at": "2026-11-02",
+     "kind": "company"
+    }
+   ]
   },
   {
    "title": "Consumer staples keep losing ground as volume growth stalls",
    "summary": "Meridian Consumer Brands (fictional) has fallen about 26% from its 52-week high. Two demo peers reported flat unit volumes last week, with growth coming only from price increases.",
    "why_it_matters": "Price-led growth tends to fade once shoppers trade down. A cheaper share price only helps if volumes stabilise; until then the decline may reflect lower future earnings rather than a temporary sell-off.",
    "status": "established",
-   "tickers": ["MRDN"],
-   "sources": [{"title": "Demo peer results summary", "url": "https://example.com/demo/staples-volumes", "publisher": "Demo source", "published_at": "2026-10-29", "kind": "news"}]
+   "tickers": [
+    "MRDN"
+   ],
+   "sources": [
+    {
+     "title": "Demo peer results summary",
+     "url": "https://example.com/demo/staples-volumes",
+     "publisher": "Demo source",
+     "published_at": "2026-10-29",
+     "kind": "news"
+    }
+   ]
   },
   {
    "title": "Treasury yields edge higher ahead of a demo jobs report",
    "summary": "The synthetic 10-year yield is slightly higher this morning. The fictional jobs report is due on Friday.",
    "why_it_matters": "Higher yields raise the discount rate applied to long-duration growth stocks. A single day's move is small; the direction over the next week matters more.",
    "status": "uncertain",
-   "sources": [{"title": "Demo economic calendar", "url": "https://example.com/demo/calendar", "publisher": "Demo source", "published_at": "2026-11-02", "kind": "official"}]
+   "sources": [
+    {
+     "title": "Demo economic calendar",
+     "url": "https://example.com/demo/calendar",
+     "publisher": "Demo source",
+     "published_at": "2026-11-02",
+     "kind": "official"
+    }
+   ]
   }
  ],
  "market_read": {
   "summary": "Synthetic US futures point to a quiet open, Europe is mixed and Asia closed lower. Nothing in the cross-asset picture contradicts the stock-specific stories above, but none of it confirms them either.",
   "notes": [
-   {"instrument_key": "es", "comment": "Futures move before the cash index opens; their change is measured against the prior settlement, not yesterday's index close."},
-   {"instrument_key": "ust10y", "comment": "Official end-of-day yield from the previous session; the live row below it is an intraday proxy."}
+   {
+    "instrument_key": "es",
+    "comment": "Futures move before the cash index opens; their change is measured against the prior settlement, not yesterday's index close."
+   },
+   {
+    "instrument_key": "ust10y",
+    "comment": "Official end-of-day yield from the previous session; the live row below it is an intraday proxy."
+   }
   ],
   "attribution_caveat": "Moves that coincide with news are not proof that the news caused them."
  },
@@ -57,10 +97,25 @@
      "materiality": "Northwind is described in demo filings as a top-five customer, so the link is material either way.",
      "priced_in": "Quartzline's shares barely moved, which suggests investors are waiting for its own order data.",
      "label": "hypothesis",
-     "sources": [{"title": "Demo supplier filing", "url": "https://example.com/demo/qrtz-10k", "publisher": "Demo source", "kind": "filing"}]
+     "sources": [
+      {
+       "title": "Demo supplier filing",
+       "url": "https://example.com/demo/qrtz-10k",
+       "publisher": "Demo source",
+       "kind": "filing"
+      }
+     ]
     }
    ],
-   "sources": [{"title": "Demo conference transcript", "url": "https://example.com/demo/nwsc-conference", "publisher": "Demo source", "published_at": "2026-11-02", "kind": "company"}]
+   "sources": [
+    {
+     "title": "Demo conference transcript",
+     "url": "https://example.com/demo/nwsc-conference",
+     "publisher": "Demo source",
+     "published_at": "2026-11-02",
+     "kind": "company"
+    }
+   ]
   }
  ],
  "ideas": [
@@ -69,75 +124,172 @@
    "symbol": "NWSC",
    "action": "consider_buying",
    "decision_today": false,
-   "horizon": {"label": "3–6 months", "min_days": 60, "max_days": 180},
+   "horizon": {
+    "label": "3–6 months",
+    "min_days": 60,
+    "max_days": 180
+   },
+   "summary": "Supply is easing and the shares are 20% off their high; a pullback to the October lows would be a better entry than today's bounce.",
+   "outlook": "If results on 19 November confirm healthy orders, a move back toward the 50-day average (about $188) is plausible over three months.",
    "thesis": "A pullback toward the October lows could offer a better entry into a business whose supply constraints may be easing.",
    "why_now": "The shares have fallen about 20% from the September high while the company's own update points to improving supply. Waiting for the zone avoids chasing a one-day rebound.",
    "catalyst": "Results on 19 November should show whether orders support the capacity comments.",
-   "entry": {"low": 158.0, "high": 166.0, "derivation": "The zone runs from just below the 20-day low (165.92) down toward the middle of the gap above the July swing low. The October swing low at 170.62 is the nearest support above it; a move back into the zone would retest the base of the recent range rather than the September highs.", "basis": ["low_20d", "swing_low:2026-10-15"]},
-   "conditions": ["Price trades within 158–166 on a closing basis, not just intraday.", "No guidance cut in the 19 November results; if results come first, reassess the zone afterwards.", "Spreads remain normal at the time (the stock trades about $1.9bn a day in this demo)."],
-   "invalidation": {"level": 149.5, "meaning": "reassess", "derivation": "Below the 200-day average (150.34) and the July swing low (150.22), the longer-term uptrend would be broken and the pullback would look more like a change in trend.", "gap_risk": "Shares can open below this level after results, so it is a point to reassess, not a guaranteed exit price."},
-   "scenarios": [
-    {"name": "Base", "target": 188.0, "horizon": "about 3 months", "rationale": "A return to the 50-day average if results confirm easing supply without weaker orders."},
-    {"name": "Upside", "target": 210.0, "horizon": "about 6 months", "rationale": "A retest of the September high if orders accelerate."}
+   "entry": {
+    "low": 158.0,
+    "high": 166.0,
+    "derivation": "The zone runs from just below the 20-day low (165.92) down toward the middle of the gap above the July swing low. The October swing low at 170.62 is the nearest support above it; a move back into the zone would retest the base of the recent range rather than the September highs.",
+    "basis": [
+     "low_20d",
+     "swing_low:2026-10-15"
+    ]
+   },
+   "conditions": [
+    "Price trades within 158–166 on a closing basis, not just intraday.",
+    "No guidance cut in the 19 November results; if results come first, reassess the zone afterwards.",
+    "Spreads remain normal at the time (the stock trades about $1.9bn a day in this demo)."
    ],
-   "costs_and_risks": ["Earnings on 19 November fall inside the horizon and can move the stock sharply in either direction.", "Buying USD shares from HKD cash would add a currency conversion cost.", "Semiconductor shares tend to move together; this would add to any existing chip exposure."],
+   "invalidation": {
+    "level": 149.5,
+    "meaning": "reassess",
+    "derivation": "Below the 200-day average (150.34) and the July swing low (150.22), the longer-term uptrend would be broken and the pullback would look more like a change in trend.",
+    "gap_risk": "Shares can open below this level after results, so it is a point to reassess, not a guaranteed exit price."
+   },
+   "scenarios": [
+    {
+     "name": "Base",
+     "target": 188.0,
+     "horizon": "about 3 months",
+     "rationale": "A return to the 50-day average if results confirm easing supply without weaker orders."
+    },
+    {
+     "name": "Upside",
+     "target": 210.0,
+     "horizon": "about 6 months",
+     "rationale": "A retest of the September high if orders accelerate."
+    }
+   ],
+   "costs_and_risks": [
+    "Earnings on 19 November fall inside the horizon and can move the stock sharply in either direction.",
+    "Buying USD shares from HKD cash would add a currency conversion cost.",
+    "Semiconductor shares tend to move together; this would add to any existing chip exposure."
+   ],
    "counter_argument": "Shorter lead times are what a demand slowdown looks like from the outside. If customers are ordering less, the 20% fall may be the start of a downturn rather than a buying opportunity.",
    "would_change_view": "Evidence of falling orders or a guidance cut on 19 November; a close below 149.50.",
    "value_or_trap": "The fall from the high is not evidence of value on its own. What separates a pullback from a trap here is order data; until results, the zone is a conditional entry, not a judgement that the stock is cheap.",
    "confidence": "moderate",
    "confidence_basis": "The company's own comments support the thesis, but the key evidence (orders) is not yet published.",
-   "sources": [{"title": "Demo conference transcript", "url": "https://example.com/demo/nwsc-conference", "publisher": "Demo source", "kind": "company"}]
+   "sources": [
+    {
+     "title": "Demo conference transcript",
+     "url": "https://example.com/demo/nwsc-conference",
+     "publisher": "Demo source",
+     "kind": "company"
+    }
+   ]
   },
   {
    "idea_id": "2026-11-03-HLDX",
    "symbol": "HLDX",
    "action": "consider_trimming",
    "decision_today": true,
-   "horizon": {"label": "Review this week", "min_days": 1, "max_days": 10},
+   "horizon": {
+    "label": "Review this week",
+    "min_days": 1,
+    "max_days": 10
+   },
+   "summary": "Harbourline is now more than half of the demo account after a long climb.",
+   "outlook": "No price view: the question is how much one company should drive the account's result.",
    "thesis": "One holding now makes up more than half of the demo account, so the account's result depends mostly on a single company.",
    "why_now": "The shares are near their 52-week high after a steady climb, so the position has grown as a share of the account without any decision being made.",
    "catalyst": "No company event is due; the trigger is concentration, not news.",
-   "conditions": ["Decide what single-company weight you are comfortable with; Cheez does not suggest a size until risk preferences are configured.", "Check the tax position outside this account before selling, which Cheez cannot see."],
+   "conditions": [
+    "Decide what single-company weight you are comfortable with; Cheez does not suggest a size until risk preferences are configured.",
+    "Check the tax position outside this account before selling, which Cheez cannot see."
+   ],
    "scenarios": [],
-   "costs_and_risks": ["Selling a rising stock can mean giving up further gains.", "Commissions and any tax on gains reduce the benefit."],
+   "costs_and_risks": [
+    "Selling a rising stock can mean giving up further gains.",
+    "Commissions and any tax on gains reduce the benefit."
+   ],
    "counter_argument": "The business is performing well and nothing has gone wrong. Trimming a winner purely for balance can lower returns if the trend continues.",
    "would_change_view": "If you decide a concentrated position is intended, this becomes a hold.",
    "confidence": "moderate",
    "confidence_basis": "Concentration is measured directly from the account; the judgement on how much is too much depends on preferences Cheez does not have.",
-   "sources": [{"title": "Demo account snapshot", "url": "https://example.com/demo/account", "publisher": "Demo source", "kind": "data"}]
+   "sources": [
+    {
+     "title": "Demo account snapshot",
+     "url": "https://example.com/demo/account",
+     "publisher": "Demo source",
+     "kind": "data"
+    }
+   ]
   },
   {
    "idea_id": "2026-11-03-MRDN",
    "symbol": "MRDN",
    "action": "hold",
    "decision_today": false,
-   "horizon": {"label": "Until volumes report", "min_days": 20, "max_days": 90},
+   "horizon": {
+    "label": "Until volumes report",
+    "min_days": 20,
+    "max_days": 90
+   },
+   "summary": "Volumes are stalling, so the lower price may reflect lower earnings rather than a bargain.",
+   "outlook": "Likely range-bound near the August–September lows until volumes stabilise.",
    "thesis": "Hold, without adding: the fall looks driven by stalling volumes, which can lower future earnings, so the lower price is not yet a bargain.",
    "why_now": "The stock is near its August–September lows (about 33.6–34.0), the area where buyers stepped in before.",
    "catalyst": "Next quarterly volume figures; peers' commentary on trade-down.",
-   "conditions": ["Look for unit volumes to stop falling before considering more."],
+   "conditions": [
+    "Look for unit volumes to stop falling before considering more."
+   ],
    "scenarios": [],
-   "costs_and_risks": ["If the lows near 33.6 give way, the next reference is the 52-week low at 32.79."],
+   "costs_and_risks": [
+    "If the lows near 33.6 give way, the next reference is the 52-week low at 32.79."
+   ],
    "counter_argument": "Staples companies with strong brands often recover once price increases annualise, and the shares already price in a lot of bad news.",
    "would_change_view": "Two quarters of stable volumes would make the lower price more interesting; a guidance cut would make the case for exiting stronger.",
    "value_or_trap": "Risk of a value trap: the shares are cheaper, but the reason (falling volumes) directly reduces earnings.",
    "confidence": "low",
    "confidence_basis": "Evidence comes from peers rather than Meridian itself.",
-   "sources": [{"title": "Demo peer results summary", "url": "https://example.com/demo/staples-volumes", "publisher": "Demo source", "kind": "news"}]
+   "sources": [
+    {
+     "title": "Demo peer results summary",
+     "url": "https://example.com/demo/staples-volumes",
+     "publisher": "Demo source",
+     "kind": "news"
+    }
+   ]
   }
  ],
  "no_setup_statement": null,
  "portfolio": {
   "summary": "The demo account is concentrated: Harbourline is more than half of it, followed by a Hong Kong holding and Meridian. Cash is split between US dollars and Hong Kong dollars, and only the US dollar cash could fund a US purchase without a currency conversion.",
   "holding_notes": [
-   {"instrument_key": "HLDX", "comment": "Near its 52-week high; the main source of concentration."},
-   {"instrument_key": "MRDN", "comment": "The broker did not report a cost price, so no gain or loss is shown."}
+   {
+    "instrument_key": "HLDX",
+    "comment": "Near its 52-week high; the main source of concentration."
+   },
+   {
+    "instrument_key": "MRDN",
+    "comment": "The broker did not report a cost price, so no gain or loss is shown."
+   }
   ],
-  "fit_of_ideas": ["Adding Northwind would add semiconductor exposure to an account that currently has none, and would lower the share held in Harbourline if funded from new cash.", "The open buy order for Quartzline at 55 sits above its current price; check it still reflects your intent."]
+  "fit_of_ideas": [
+   "Adding Northwind would add semiconductor exposure to an account that currently has none, and would lower the share held in Harbourline if funded from new cash.",
+   "The open buy order for Quartzline at 55 sits above its current price; check it still reflects your intent."
+  ]
  },
  "calendar": [
-  {"when": "2026-11-07 08:30 ET", "what": "Demo jobs report", "relevance": "Rates and growth stocks are sensitive to labour-market surprises."},
-  {"when": "2026-11-19 after close", "what": "Northwind results (fictional)", "relevance": "Tests the capacity thesis behind idea 1."}
+  {
+   "when": "2026-11-07 08:30 ET",
+   "what": "Demo jobs report",
+   "relevance": "Rates and growth stocks are sensitive to labour-market surprises."
+  },
+  {
+   "when": "2026-11-19 after close",
+   "what": "Northwind results (fictional)",
+   "relevance": "Tests the capacity thesis behind idea 1."
+  }
  ],
  "source_conflicts": [],
  "research_notes": "Demonstration content: every company, figure and source link on this page is fictional."

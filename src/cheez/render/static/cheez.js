@@ -82,6 +82,107 @@
     }
   }
 
+
+  // ---- Reader preferences: language, second currency, theme (kept in this browser only) ----
+  var KEY = "cheez.prefs";
+  var SYM = { USD: "$", GBP: "£", EUR: "€", HKD: "HK$", CNY: "¥", TWD: "NT$", JPY: "¥", SGD: "S$", AUD: "A$", CAD: "C$", CHF: "CHF ", KRW: "₩" };
+  var ZERO = { JPY: 1, KRW: 1, TWD: 1 };
+  var SUF = { k: 1e3, m: 1e6, bn: 1e9, tn: 1e12 };
+  var LANG_ATTR = { "en": "en", "zh-Hant": "zhHant", "zh-Hans": "zhHans" };
+  function loadPrefs() {
+    try { return JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { return {}; }
+  }
+  function savePrefs(p) {
+    try { localStorage.setItem(KEY, JSON.stringify(p)); } catch (e) { /* private mode: preferences last for this visit */ }
+  }
+  var main0 = document.getElementById("edition");
+  var defaults = { lang: main0 ? main0.getAttribute("data-lang") || "en" : "en", fx: main0 ? main0.getAttribute("data-fx") || "" : "" };
+  var prefs = loadPrefs();
+  function pref(k) { return Object.prototype.hasOwnProperty.call(prefs, k) ? prefs[k] : defaults[k]; }
+
+  function fxTable(root) {
+    var el = (root || document).querySelector("script.cheez-fx");
+    try { return JSON.parse(el.textContent).per_usd || {}; } catch (e) { return {}; }
+  }
+  function convert(v, from, to, rates, suf) {
+    if (!to || to === from || !rates[from] || !rates[to]) return null;
+    var x = v / rates[from] * rates[to];
+    var sym = SYM[to] || to + " ";
+    if (suf) return "≈" + sym + (x / SUF[suf]).toLocaleString("en-GB", { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + suf;
+    var d = ZERO[to] || Math.abs(x) >= 10000 ? 0 : 2;
+    return "≈" + sym + x.toLocaleString("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d });
+  }
+  function applyFx(root) {
+    var to = pref("fx");
+    var rates = fxTable(root);
+    Array.prototype.forEach.call((root || document).querySelectorAll("ruby.m"), function (r) {
+      Array.prototype.slice.call(r.querySelectorAll("rt, rp")).forEach(function (n) { n.remove(); });
+      var txt = convert(parseFloat(r.getAttribute("data-v")), r.getAttribute("data-c"), to, rates, r.getAttribute("data-s"));
+      if (!txt) return;
+      var rp1 = document.createElement("rp"); rp1.textContent = "(";
+      var rt = document.createElement("rt"); rt.textContent = txt;
+      var rp2 = document.createElement("rp"); rp2.textContent = ")";
+      r.appendChild(rp1); r.appendChild(rt); r.appendChild(rp2);
+    });
+  }
+  function applyLang(root) {
+    var lang = pref("lang");
+    var key = LANG_ATTR[lang] || "en";
+    Array.prototype.forEach.call((root || document).querySelectorAll("[data-i18n]"), function (el) {
+      var val = el.dataset[key] || el.dataset.en;
+      if (val == null) return;
+      if (el.getAttribute("data-i18n") === "h") el.innerHTML = val; else el.textContent = val;
+    });
+    document.documentElement.setAttribute("lang", lang === "en" ? "en-GB" : lang);
+  }
+  function applyTheme() {
+    var t = pref("theme");
+    if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+    else document.documentElement.removeAttribute("data-theme");
+  }
+  function applyPrefs(root) { applyLang(root); applyFx(root); }
+
+  function wireSettings() {
+    var dlg = document.getElementById("settings");
+    var btn = document.getElementById("open-settings");
+    if (!dlg || !btn) return;
+    var form = dlg.querySelector("form");
+    function sync() {
+      Array.prototype.forEach.call(form.querySelectorAll("input[name=lang]"), function (i) { i.checked = i.value === pref("lang"); });
+      Array.prototype.forEach.call(form.querySelectorAll("input[name=theme]"), function (i) { i.checked = i.value === (pref("theme") || ""); });
+      var sel = form.querySelector("select[name=fx]");
+      if (sel) sel.value = pref("fx") || "";
+    }
+    btn.addEventListener("click", function () {
+      sync();
+      if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
+    });
+    form.addEventListener("change", function (e) {
+      var t = e.target;
+      if (!t || !t.name) return;
+      prefs[t.name] = t.value;
+      savePrefs(prefs);
+      if (t.name === "theme") applyTheme(); else applyPrefs(document);
+    });
+  }
+
+  // ---- Highlight the section in view ----
+  function wireNav() {
+    var links = Array.prototype.slice.call(document.querySelectorAll(".edbar nav a[href^='#']"));
+    if (!("IntersectionObserver" in window) || !links.length) return;
+    var byId = {};
+    links.forEach(function (a) { byId[a.getAttribute("href").slice(1)] = a; });
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        links.forEach(function (a) { a.classList.remove("active"); });
+        var a = byId[en.target.id];
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-40% 0px -55% 0px" });
+    Object.keys(byId).forEach(function (id) { var el = document.getElementById(id); if (el) io.observe(el); });
+  }
+
   // ---- Archive: open past editions in place (index page only) ----
   var main = document.getElementById("edition");
   var latestHTML = main ? main.innerHTML : null;
@@ -89,7 +190,7 @@
     if (!main) return;
     if (!id || id === "latest") {
       main.innerHTML = latestHTML;
-      wireCharts(main); checkFreshness(main);
+      wireCharts(main); checkFreshness(main); applyPrefs(main);
       return;
     }
     if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z-]+$/.test(id)) return;
@@ -101,7 +202,7 @@
       note.innerHTML = "<div class=\"banner warn\" role=\"note\"><span><strong>Archive edition.</strong> You are reading a past edition; prices and views are as of its date. <a href=\"#latest\">Return to the latest edition</a>.</span></div>";
       main.appendChild(note);
       main.appendChild(tpl.content.cloneNode(true));
-      wireCharts(main);
+      wireCharts(main); applyPrefs(main);
       window.scrollTo(0, 0);
       return;
     }
@@ -118,7 +219,7 @@
       back.className = "banner warn";
       back.innerHTML = "<span><strong>Archive edition.</strong> You are reading a past edition. <a href=\"#latest\">Return to the latest edition</a>.</span>";
       main.insertBefore(back, main.firstChild);
-      wireCharts(main);
+      wireCharts(main); applyPrefs(main);
       window.scrollTo(0, 0);
     }).catch(function () {
       window.location.href = url;  // fall back to opening the file directly
@@ -131,7 +232,11 @@
   }
   window.addEventListener("hashchange", route);
 
+  applyTheme();
   wireCharts(document);
   checkFreshness(document);
+  if (pref("lang") !== defaults.lang || pref("fx") !== defaults.fx) applyPrefs(document);
+  wireSettings();
+  wireNav();
   route();
 })();

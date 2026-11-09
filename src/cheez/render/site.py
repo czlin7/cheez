@@ -2,23 +2,27 @@
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
+from markupsafe import Markup
 
+from .. import i18n
 from .. import session as sess
+from .. import settings as settings_mod
 from ..analytics import ledger as ledger_mod
 from ..analytics.portfolio import FxBook, account_view, holdings_index
-from ..config import GROUP_ORDER, INSTRUMENTS
+from ..config import GROUP_ORDER
 from ..editorial.validate import IdeaDerived, ValidationReport
-from ..models import Editorial, MarketSnapshot, PortfolioSnapshot, RunRecord, StockFacts
+from ..models import Editorial, Idea, MarketSnapshot, PortfolioSnapshot, RunRecord, StockFacts
 from ..state import State, archive_templates, state_script
 from . import charts
-from .format import FILTERS, LONDON, NY
+from .format import FILTERS, NY, RenderOptions, options, restore, use
 
 HERE = Path(__file__).parent
 UTC = timezone.utc
@@ -34,6 +38,8 @@ def _env() -> Environment:
     )
     env.filters.update(FILTERS)
     env.filters["abs"] = abs
+    env.globals["long_date"] = lambda d: i18n.span(
+        {k: i18n.long_date(d, k) for k in options().langs}, options().lang, langs=options().langs)
     return env
 
 
@@ -57,21 +63,22 @@ def session_text(ctx) -> str:
     if not ctx.is_trading_day:
         nxt = ctx.next_session
         return f"US markets closed today · next session {nxt:%a %-d %b}" if nxt else "US markets closed today"
-    o = ctx.open_utc
+    o, opts = ctx.open_utc, options()
     if ctx.phase == "pre_open":
-        return f"US pre-market · opens {o.astimezone(LONDON):%H:%M} London ({o.astimezone(NY):%H:%M} New York)"
+        if str(opts.tz) == "America/New_York":
+            return f"US pre-market · opens {o.astimezone(NY):%H:%M} New York"
+        return f"US pre-market · opens {o.astimezone(opts.tz):%H:%M} {opts.city} ({o.astimezone(NY):%H:%M} New York)"
     if ctx.phase == "regular":
-        return f"US regular session in progress (opened {o.astimezone(LONDON):%H:%M} London)"
+        return f"US regular session in progress (opened {o.astimezone(opts.tz):%H:%M} {opts.city})"
     if ctx.phase == "post_close":
         return "US regular session closed · after-hours trading"
     return "US overnight session"
 
 
-def next_expected_edition(edition_date, scheduled_ny_time: tuple[int, int] = (8, 30)) -> datetime:
+def next_expected_edition(edition_date) -> datetime:
     """When the edition after this one should exist: the next NYSE session after
-    ``edition_date`` at the scheduled publication time (New York)."""
-    d = sess.next_session(edition_date)
-    return datetime(d.year, d.month, d.day, scheduled_ny_time[0], scheduled_ny_time[1], tzinfo=NY).astimezone(UTC)
+    ``edition_date`` at the configured delivery time, in the reader's timezone."""
+    return settings_mod.get().schedule.deliver_utc(sess.next_session(edition_date))
 
 
 def _read_minutes(ed: Optional[Editorial]) -> Optional[int]:
@@ -127,11 +134,12 @@ def _portfolio_view(p: Optional[PortfolioSnapshot]) -> dict:
                 "aside": "Not available", "accounts": [], "messages": []}
     fx = FxBook.from_rates(p.fx)
     views = [account_view(a, fx) for a in p.accounts]
-    aside = ("Demonstration data" if p.demo else f"Longbridge, read-only · as of {p.as_of.astimezone(LONDON):%H:%M} London"
+    o = options()
+    aside = ("Demonstration data" if p.demo else f"Longbridge, read-only · as of {p.as_of.astimezone(o.tz):%H:%M} {o.city}"
              if p.as_of else "Longbridge, read-only")
     msgs = list(p.messages)
     for r in p.fx:
-        msgs.append(f"FX used: 1 {r.pair[:3]} = {r.rate:.4f} {r.pair[3:]} ({r.source}, {r.as_of.astimezone(LONDON):%H:%M} London).")
+        msgs.append(f"FX used: 1 {r.pair[:3]} = {r.rate:.4f} {r.pair[3:]} ({r.source}, {r.as_of.astimezone(o.tz):%H:%M} {o.city}).")
     for a in p.accounts:
         if a.margin_or_financing_note:
             msgs.append(a.margin_or_financing_note)
@@ -160,6 +168,105 @@ def _feasibility(idea, facts: Optional[StockFacts], p: Optional[PortfolioSnapsho
             "This is an arithmetic ceiling, not a suggested size; sizing waits for configured risk preferences.")
 
 
+# ---------------------------------------------------------------------------
+# Render options (language, timezone, currency) shared by every filter
+# ---------------------------------------------------------------------------
+
+
+def render_options(market: Optional[MarketSnapshot], translations: Optional[dict] = None, *,
+                   lang: Optional[str] = None, convert_to: Optional[str] = None, fx_mode: str = "ruby") -> RenderOptions:
+    cfg = settings_mod.get()
+    return RenderOptions(
+        tz=cfg.schedule.tz,
+        lang=lang or cfg.report.default_language,
+        langs=tuple(cfg.report.languages),
+        convert_to=cfg.report.convert_to if convert_to is None else convert_to,
+        per_usd=dict(market.display_fx.per_usd) if market else {},
+        fx_mode=fx_mode,
+        translations=translations or {},
+    )
+
+
+class rendering:
+    """``with rendering(opts): ...`` makes ``opts`` visible to the template filters."""
+
+    def __init__(self, opts: RenderOptions):
+        self.opts = opts
+
+    def __enter__(self) -> RenderOptions:
+        self._token = use(self.opts)
+        return self.opts
+
+    def __exit__(self, *exc) -> None:
+        restore(self._token)
+
+
+# ---------------------------------------------------------------------------
+# Today's playbook and the market pulse
+# ---------------------------------------------------------------------------
+
+PULSE = [("es", "S&P 500 futures"), ("nq", "Nasdaq 100 futures"), ("vix", "VIX"), ("ust10y", "US 10-year"),
+         ("dxy", "Dollar index"), ("gbpusd", "GBP/USD"), ("wti", "WTI crude"), ("gold", "Gold")]
+
+
+def _pulse(m: MarketSnapshot) -> list[dict]:
+    by_key = {i.key: i for i in m.instruments}
+    out = []
+    for key, label in PULSE:
+        i = by_key.get(key) or (by_key.get("tnx") if key == "ust10y" else None)
+        if i is None or i.last is None:
+            continue
+        out.append({"inst": i, "label": label,
+                    "spark": charts.sparkline([b.c for b in i.history[-44:]], width=96, height=28,
+                                              label=f"{label}, recent daily closes")})
+    return out
+
+
+def _target(idea: Idea) -> Optional[float]:
+    if not idea.entry:
+        return None
+    mid = (idea.entry.low + idea.entry.high) / 2
+    ups = [s.target for s in idea.scenarios if s.target is not None and s.target > mid]
+    return min(ups) if ups else None
+
+
+def _base_scenario(idea: Idea):
+    return next((s for s in idea.scenarios if s.name.lower().startswith("base")), idea.scenarios[0] if idea.scenarios else None)
+
+
+def _playbook(ideas: list[dict], editorial: Optional[Editorial], stocks: dict[str, StockFacts], held: dict,
+              max_trades: int) -> dict:
+    cards = []
+    for rank, it in enumerate(ideas[:max_trades], 1):
+        idea: Idea = it["idea"]
+        f: Optional[StockFacts] = it["facts"]
+        hist = [b.c for b in (f.history[-63:] if f else [])]
+        scen = _base_scenario(idea)
+        cards.append({
+            "rank": rank, "idea": idea, "facts": f, "derived": it["derived"],
+            "held": idea.symbol.upper() in held, "target": _target(idea),
+            "why": idea.summary or idea.thesis,
+            "outlook": idea.outlook or (scen.rationale if scen else None),
+            "outlook_horizon": None if idea.outlook else (scen.horizon if scen else None),
+            "spark": charts.sparkline(hist, width=280, height=64,
+                                      zone=(idea.entry.low, idea.entry.high) if idea.entry else None,
+                                      inval=idea.invalidation.level if idea.invalidation else None,
+                                      label=f"{idea.symbol}, last three months of daily closes"),
+        })
+    radar = []
+    if editorial and len(cards) < max_trades:
+        taken = {c["idea"].symbol.upper() for c in cards}
+        for fs in editorial.featured:
+            sym = fs.symbol.upper()
+            if sym in taken or len(cards) + len(radar) >= max_trades:
+                continue
+            f = stocks.get(sym)
+            radar.append({"featured": fs, "facts": f, "held": sym in held,
+                          "spark": charts.sparkline([b.c for b in (f.history[-63:] if f else [])], width=280, height=48,
+                                                    label=f"{sym}, last three months of daily closes")})
+    return {"cards": cards, "radar": radar}
+
+
 def build_view(
     *,
     edition: EditionMeta,
@@ -180,6 +287,9 @@ def build_view(
     for g in sorted(by_group, key=lambda x: order.get(x, 99)):
         groups.append((g, by_group[g]))
     inst_labels = {i.key: i.label for i in market.instruments}
+    sparks = {i.key: charts.sparkline([b.c for b in i.history[-66:]], width=72, height=22,
+                                      label=f"{i.label}, last three months")
+              for i in market.instruments if len(i.history) > 5}
     held = holdings_index(portfolio)
     ideas = []
     if editorial:
@@ -213,8 +323,15 @@ def build_view(
     if portfolio and portfolio.status in ("ok", "partial"):
         method_notes.append("Portfolio data is read through a read-only Longbridge connection (OAuth scopes account.read and trade.read only). "
                             "Cheez cannot place, change or cancel orders, move money or edit watchlists or alerts.")
+    cfg = settings_mod.get()
+    fx = market.display_fx
     return {
         "edition": edition,
+        "playbook": _playbook(ideas, editorial, stocks, held, cfg.report.max_trades),
+        "pulse": _pulse(market),
+        "sparks": sparks,
+        "fx_json": Markup(json.dumps({"per_usd": fx.per_usd, "as_of": fx.as_of.isoformat() if fx.as_of else None,
+                                      "source": fx.source}).replace("<", "\\u003c")),
         "session": market.session,
         "session_text": session_text(market.session),
         "market": market,
@@ -248,7 +365,14 @@ def render_page(*, body: str, view: dict, document: bool, archive: Optional[list
     ed: EditionMeta = view["edition"]
     nxt = ed.next_expected.isoformat() if ed.next_expected else ""
     title = "Cheez Daily" if archive is not None else f"Cheez Daily {ed.date:%-d %b %Y}"
+    o = options()
     html = env.get_template("page.html.j2").render(
+        lang=o.lang,
+        html_lang=i18n.HTML_LANG.get(o.lang, "en"),
+        langs=[(k, settings_mod.LANGUAGES[k]) for k in o.langs],
+        convert_to=o.convert_to,
+        currencies=settings_mod.DISPLAY_CURRENCIES,
+        logo=(HERE / "static" / "logo.svg").read_text(),
         title=title,
         document=document,
         css=css,
@@ -259,7 +383,7 @@ def render_page(*, body: str, view: dict, document: bool, archive: Optional[list
         archive=archive,
         has_editorial=view["editorial"] is not None,
         has_featured=bool(view["editorial"] and view["editorial"].featured),
-        generated=ed.published_at.astimezone(LONDON).strftime("%-d %b %Y %H:%M London"),
+        generated=ed.published_at.astimezone(o.tz).strftime(f"%-d %b %Y %H:%M {o.city}"),
         home_href=home_href,
     )
     if extra_tail:

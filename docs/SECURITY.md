@@ -100,6 +100,30 @@ Verified on 3 Nov 2026: in a headless Claude Code session started from this
 repository with lockdown on, the hook refused `printenv` before it ran
 ("Cheez guard: that program or path is not allowed").
 
+### Pending guard update
+
+The lockdown allowlist in `.claude/hooks/guard.py` was written before
+`cheez email`, `cheez config` and `cheez schedule` existed, so in the locked
+environment (Longbridge token present) those commands are refused. The
+intended addition, for the owner to review and apply by hand (automated
+sessions are rightly not allowed to edit their own guard):
+
+```python
+# in _cheez_args_ok(), before the final `return False`
+if sub == "config":
+    return rest in ([], ["show"], ["path"])          # never `init`
+if sub == "schedule":
+    return rest in ([], ["--agent", "claude"], ["--agent", "codex"])
+if sub == "email":
+    return len(rest) == len(set(rest)) and all(a in ("--send", "--force") for a in rest)
+```
+
+Recipients come only from settings and the environment, which the locked
+agent cannot change, so allowing `email --send` does not let the agent send
+the edition anywhere else. Add matching cases to
+`tests/test_readonly_boundary.py`. Without a token (no lockdown) all commands
+already work.
+
 ## Where data goes
 
 | Data | Where it goes | Why |
@@ -109,6 +133,7 @@ repository with lockdown on, the hook refused `printenv` before it ran
 | Minimised portfolio view (tickers, weights, whether cash/sellable quantity exists; **no** cost basis, quantities or values) | The language model (Anthropic), via the research brief | Relate ideas to existing exposure |
 | Company names and topics | Web search providers | Research. Holdings are never searched as "my portfolio"; quantities and values are never searched |
 | Market data requests (tickers, including holdings) | Yahoo Finance, Nasdaq.com, US Treasury | Prices and calendars |
+| The email digest (no portfolio unless `include_portfolio`) | Your SMTP server or Resend, then your mailbox | Inbox delivery, only when enabled |
 
 **Model-provider data flow.** The scheduled run is a Claude Code session, so
 everything the agent reads (the brief, search results, the editorial) is
@@ -124,7 +149,11 @@ identifiers.
 - Editions are published to a **private** claude.ai artifact (visible only to
   you unless you share it). Its history is kept as artifact versions; the
   ledger, run log and recent archive are embedded in the page itself.
-- Nothing is emailed. No connectors are attached to the scheduled task.
+- Nothing is emailed unless you turn email on (EMAIL.md); the digest then
+  leaves out the portfolio by default. No connectors are attached to the
+  scheduled task.
+- Settings that contain your email address live in `cheez.toml`
+  (gitignored) or the cloud environment, never in the repository.
 
 ## If something leaks
 

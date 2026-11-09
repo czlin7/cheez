@@ -354,9 +354,17 @@ def render(edition_id: str, *, closed: bool = False, market_only_reason: Optiona
     if prev_eds:
         p = max(prev_eds, key=lambda e: (e.date, e.published_at))
         previous = {"id": p.id, "date": p.date, "headline": p.headline}
-    view = site.build_view(edition=meta, market=pack.market, stocks=pack.stocks, editorial=editorial, report=rep,
-                           portfolio=pack.portfolio, state=st, run=run, previous=previous)
-    body = site.render_edition_body(view)
+    translations: dict = {}
+    if editorial is not None:
+        from .editorial import translate
+        from .settings import get as settings
+
+        translations, tr_warnings = translate.load(d, editorial, settings().report.languages)
+        rep.warnings.extend(tr_warnings)
+    with site.rendering(site.render_options(pack.market, translations)):
+        view = site.build_view(edition=meta, market=pack.market, stocks=pack.stocks, editorial=editorial, report=rep,
+                               portfolio=pack.portfolio, state=st, run=run, previous=previous)
+        body = site.render_edition_body(view)
 
     headline = editorial.headline if editorial else meta.closed_headline
     st.editions = [e for e in st.editions if e.id != edition_id]
@@ -376,12 +384,14 @@ def render(edition_id: str, *, closed: bool = False, market_only_reason: Optiona
 
     site_dir = var_dir() / ("site-demo" if pack.demo else "site")
     site_dir.mkdir(parents=True, exist_ok=True)
-    index_fragment = site.assemble_index(body=body, view=view, state=st, archive_items=archive_items, document=False)
-    index_doc = site.assemble_index(body=body, view=view, state=st, archive_items=archive_items, document=True)
-    edition_doc = site.render_page(body=body, view=view, document=True, archive=None, home_href="../cheez-daily.html")
+    with site.rendering(site.render_options(pack.market, translations)):
+        index_fragment = site.assemble_index(body=body, view=view, state=st, archive_items=archive_items, document=False)
+        index_doc = site.assemble_index(body=body, view=view, state=st, archive_items=archive_items, document=True)
+        edition_doc = site.render_page(body=body, view=view, document=True, archive=None, home_href="../cheez-daily.html")
     (site_dir / "index.html").write_text(index_fragment)
     (site_dir / "cheez-daily.html").write_text(index_doc)
     (d / "edition.html").write_text(edition_doc)
+    (d / "translations.json").write_text(json.dumps(translations, ensure_ascii=False))
     return {"status": status, "run_status": run.status, "publish_file": str(site_dir / "index.html"),
             "preview_file": str(site_dir / "cheez-daily.html"), "edition_file": str(d / "edition.html"),
             "problems": problems, "warnings": rep.warnings if rep else [],

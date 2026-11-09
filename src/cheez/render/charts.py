@@ -147,3 +147,62 @@ def line_chart(
         "p": [[d.isoformat(), round(v, 4)] for d, v in pts],
     }, separators=(",", ":"))
     return f'<div class="svgbox" data-chart=\'{html.escape(data, quote=True)}\'>' + "".join(parts) + "</div>"
+
+
+def sparkline(
+    values: Sequence[float],
+    *,
+    width: int = 120,
+    height: int = 36,
+    zone: Optional[tuple[float, float]] = None,
+    inval: Optional[float] = None,
+    label: str = "",
+) -> str:
+    """A small trend line without axes, coloured by the direction over the
+    window, optionally with the entry zone (band) and invalidation (dashed)."""
+    vals = [float(v) for v in values if v is not None]
+    if len(vals) < 2:
+        return ""
+    lo, hi = min(vals), max(vals)
+    for x in ([*zone] if zone else []) + ([inval] if inval is not None else []):
+        lo, hi = min(lo, x), max(hi, x)
+    pad = (hi - lo) * 0.08 or abs(hi) * 0.01 or 1
+    lo, hi = lo - pad, hi + pad
+    n = len(vals)
+
+    def X(i: int) -> float:
+        return 1 + (width - 6) * i / (n - 1)
+
+    def Y(v: float) -> float:
+        return 2 + (height - 4) * (1 - (v - lo) / (hi - lo))
+
+    trend = "up" if vals[-1] > vals[0] else "down" if vals[-1] < vals[0] else "flat"
+    parts = [f'<svg class="spark {trend}" viewBox="0 0 {width} {height}" width="{width}" height="{height}" '
+             f'role="img" aria-label="{html.escape(label)}" preserveAspectRatio="none">']
+    if zone:
+        za, zb = Y(zone[1]), Y(zone[0])
+        parts.append(f'<rect class="zone" x="0" y="{za:.1f}" width="{width}" height="{max(zb - za, 1.2):.1f}"/>')
+    if inval is not None:
+        yi = Y(inval)
+        parts.append(f'<line class="inval" x1="0" x2="{width}" y1="{yi:.1f}" y2="{yi:.1f}"/>')
+    path = " ".join(f"{'M' if i == 0 else 'L'}{X(i):.1f},{Y(v):.1f}" for i, v in enumerate(vals))
+    parts.append(f'<path class="area" d="{path} L{X(n - 1):.1f},{height} L{X(0):.1f},{height} Z"/>')
+    parts.append(f'<path class="line" d="{path}"/>')
+    parts.append(f'<circle class="dot" cx="{X(n - 1):.1f}" cy="{Y(vals[-1]):.1f}" r="2.4"/>')
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+SPARK_CHARS = "▁▂▃▄▅▆▇█"
+
+
+def text_sparkline(values: Sequence[float], width: int = 24) -> str:
+    """Unicode block sparkline for email clients that cannot show SVG."""
+    vals = [float(v) for v in values if v is not None]
+    if len(vals) < 2:
+        return ""
+    step = max(1, len(vals) // width)
+    vals = vals[::step][-width:]
+    lo, hi = min(vals), max(vals)
+    span = (hi - lo) or 1
+    return "".join(SPARK_CHARS[min(7, int((v - lo) / span * 7.999))] for v in vals)

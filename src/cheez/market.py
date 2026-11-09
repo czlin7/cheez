@@ -8,7 +8,7 @@ from typing import Optional
 
 from . import session as sess
 from .config import INSTRUMENTS, STALE_INSTRUMENT_HOURS, InstrumentDef
-from .models import Bar, Instrument, MarketSnapshot, Price, SourceStatus
+from .models import Bar, DisplayFx, Instrument, MarketSnapshot, Price, SourceStatus
 from .net import Fetcher, FetchError
 from .sources import treasury, yahoo
 
@@ -173,7 +173,26 @@ def build_snapshot(f: Fetcher, now: datetime, specs: Optional[list[InstrumentDef
         sources.append(SourceStatus(source="US Treasury par yield curve", ok=False, fetched_at=now, detail=str(e)[:200]))
     cutoff = max((i.last.as_of for i in instruments if i.last), default=now)
     return MarketSnapshot(generated_at=now, data_cutoff=min(cutoff, now), session=ctx,
-                          instruments=instruments, sources=sources)
+                          instruments=instruments, sources=sources, display_fx=display_fx(f, now))
+
+
+def display_fx(f: Fetcher, now: datetime) -> DisplayFx:
+    """USD rates for the optional "also show prices in" annotation. Best effort:
+    a currency that fails is simply not offered."""
+    from .settings import DISPLAY_CURRENCIES
+
+    out = DisplayFx(per_usd={"USD": 1.0}, as_of=now)
+    for c in DISPLAY_CURRENCIES:
+        if c == "USD":
+            continue
+        try:
+            q = yahoo.live_quote(f, f"{c}=X")
+            if q.regular_price:
+                out.per_usd[c] = float(q.regular_price)
+                out.as_of = min(out.as_of or now, q.regular_time or now)
+        except Exception:
+            continue
+    return out
 
 
 def snapshot_problems(snap: MarketSnapshot) -> list[str]:

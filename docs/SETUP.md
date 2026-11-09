@@ -4,12 +4,11 @@ Cheez already publishes a market edition without any of this. These steps add
 your Longbridge portfolio (read-only) and tidy up the schedule. Each takes a
 few minutes.
 
-## 1. Keep the scheduled task pointed at the code
+## 1. Settings and schedule
 
-The scheduled task checks out the branch `claude/cheez-daily-briefing-1ce5zf`.
-If you merge that branch into `main` and delete it, edit the task's prompt
-(claude.ai/code → Scheduled tasks → Cheez Daily → Edit) and remove the
-`git fetch … && git checkout …` line, so it uses `main`.
+Run `cheez config init`, choose your delivery time, timezone, languages and
+(optionally) email, then follow [SCHEDULING.md](SCHEDULING.md). The scheduled
+task runs the code on `main`.
 
 Recommended: protect `main` on GitHub (Settings → Branches → add a rule
 requiring pull-request review), so no automated session can change the code
@@ -23,7 +22,7 @@ passes through a chat.
 a. Install Cheez on your computer:
 
 ```bash
-pip install "cheez[brokerage] @ git+https://github.com/czlin7/cheez@claude/cheez-daily-briefing-1ce5zf"
+pip install "cheez[brokerage] @ git+https://github.com/czlin7/cheez"
 ```
 
 b. Open <https://open.longbridge.com/connect> and create an Agent Auth Code.
@@ -87,6 +86,9 @@ private reader and labels everything, but the choice is yours:
   finishes.
 
 ## Environment variables reference
+
+Settings variables (`CHEEZ_CONFIG_TOML`, `CHEEZ_EMAIL_TO`, …) are listed in
+[CONFIGURATION.md](CONFIGURATION.md). Brokerage and runtime:
 
 | Variable | Purpose |
 |---|---|

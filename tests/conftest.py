@@ -9,6 +9,19 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 
+@pytest.fixture(autouse=True)
+def default_settings(monkeypatch):
+    """Every test sees the built-in settings, never a developer's cheez.toml or environment."""
+    from cheez import settings
+
+    monkeypatch.setenv("CHEEZ_CONFIG", "/nonexistent/cheez.toml")
+    for k in list(settings.ENV_OVERRIDES) + ["CHEEZ_CONFIG_TOML"]:
+        monkeypatch.delenv(k, raising=False)
+    settings.reset()
+    yield
+    settings.reset()
+
+
 @pytest.fixture()
 def cheez_home(tmp_path, monkeypatch):
     """Isolated private working area for each test."""

@@ -73,3 +73,26 @@ def test_index_label_close_when_exchange_closed():
     label = sess.exchange_session_label(at("2026-11-02T06:45:00"), "XTKS", at("2026-11-03T12:41:00"))
     assert label == "regular_close"
     assert not sess.is_session(date(2026, 11, 3), "XTKS")
+
+
+def test_seven_am_london_run_is_for_that_days_session():
+    # 06:20 London on Tue 3 Nov is 01:20 New York: the edition is for the session opening 14:30 London.
+    ctx = sess.us_session_context(at("2026-11-03T06:20:00"), "Europe/London")
+    assert ctx.is_trading_day and ctx.phase == "pre_open" and ctx.edition_date == date(2026, 11, 3)
+
+
+def test_asian_morning_run_targets_the_coming_us_session():
+    # 07:00 Taipei on Monday 9 Nov is Sunday evening in New York.
+    ctx = sess.us_session_context(at("2026-11-08T23:00:00"), "Asia/Taipei")
+    assert ctx.is_trading_day and ctx.edition_date == date(2026, 11, 9) and ctx.phase == "pre_open"
+    # 07:00 Taipei on Tuesday is Monday after the close in New York: still Tuesday's session.
+    ctx = sess.us_session_context(at("2026-11-09T23:00:00"), "Asia/Taipei")
+    assert ctx.edition_date == date(2026, 11, 10) and ctx.phase == "pre_open"
+    # 07:00 Taipei on Thanksgiving (Wednesday evening in New York): no US session that day.
+    ctx = sess.us_session_context(at("2026-11-25T23:00:00"), "Asia/Taipei")
+    assert not ctx.is_trading_day and ctx.edition_date == date(2026, 11, 26)
+
+
+def test_evening_run_after_the_close_stays_on_the_same_day():
+    ctx = sess.us_session_context(at("2026-11-03T22:00:00"), "Europe/London")
+    assert ctx.edition_date == date(2026, 11, 3) and ctx.phase == "post_close"

@@ -5,10 +5,16 @@ description: Produce, check and publish today's Cheez Daily edition (private, re
 
 # Producing a Cheez Daily edition
 
-You are the research desk for one private investor who reads in London. Code
-supplies every number; you supply judgement, selection and clear writing. The
-edition must be something they can read in five to eight minutes and act on
-carefully, never a ticker dump and never a show of certainty.
+You are the research desk for one private investor. Code supplies every
+number; you supply judgement, selection and clear writing. The edition must be
+something they can scan in thirty seconds (the TL;DR and Today's playbook),
+read in five to eight minutes, and act on carefully: never a ticker dump and
+never a show of certainty.
+
+`.venv/bin/cheez config` prints the reader's settings: their timezone (use it
+for every time you write), the languages to write (`report.languages`), and
+whether email delivery is on. Agents other than Claude Code: read AGENTS.md
+first.
 
 Work through the steps in order. Do not skip the checks. Do not loop: every
 step below has a fixed retry budget.
@@ -154,6 +160,8 @@ from it). Key fields:
 
 - `headline` (≤ 90 characters, specific, no hype) and `dek` (2–3 sentences:
   what matters today and why).
+- `tldr` (3–4 lines, ≤ 25 words each): the edition in thirty seconds. The
+  last line summarises today's playbook (or says there is no trade today).
 - `developments` (3–5, most important first): `title`, `summary` (what
   happened), `why_it_matters`, `status` (`established` / `developing` /
   `uncertain`), optional `uncertainty`, `tickers`, `sources` (title, url,
@@ -162,10 +170,17 @@ from it). Key fields:
   `notes` keyed by instrument keys from the brief (e.g. `es`, `ust10y`), and
   an `attribution_caveat` when moves are being linked to news.
 - `changes_since_last`: 2–5 bullets.
+- For each idea, `summary` (one line, ≤ 200 characters: why this name, today)
+  and `outlook` (≤ 240 characters: what you expect over the horizon, stated
+  conditionally, e.g. "If results confirm orders, a move toward the 50-day
+  average (about $188) is plausible over three months"). These two lines and
+  the computed levels make up the "Today's playbook" card the reader sees
+  first, so rank the ideas the reader should look at first at the top. The
+  playbook shows at most `report.max_trades` ideas.
 - `featured`, `ideas`, `no_setup_statement`, `portfolio` (only when portfolio
   data is available: summary, holding notes keyed by ticker, how today's ideas
   would fit the existing exposure), `calendar` (events in the next two weeks
-  with London/New York times where relevant), `source_conflicts`, and
+  with the reader's local and New York times where relevant), `source_conflicts`, and
   `research_notes`.
 
 House style: clear English for an intelligent non-professional. Short
@@ -181,15 +196,37 @@ rather than restating it). After three failed attempts, run
 `.venv/bin/cheez fail "editorial did not pass validation: <short reason>"`, which
 publishes a clearly labelled market-data-only edition, then publish (step 6).
 
-When `.venv/bin/cheez check` passes, run `.venv/bin/cheez render`.
+When `.venv/bin/cheez check` passes, write the translations (step 5b), then
+run `.venv/bin/cheez render`.
+
+## 5b. Translations (one file per extra language in `report.languages`)
+
+For `zh-Hant` and `zh-Hans`, write `var/editions/<id>/editorial.zh-Hant.json`
+and `editorial.zh-Hans.json`: a copy of the checked `editorial.json` with only
+the prose translated. Keep every key, list item and number exactly as in
+English; do not translate tickers, idea ids, URLs, enum values (`status`,
+`action`, `confidence`, `kind`, ...), `basis` keys or calendar `when` values.
+Company names may stay in English. Traditional Chinese follows Taiwan and Hong
+Kong usage (加碼, 殖利率); Simplified follows mainland usage (加仓, 收益率).
+Translate meaning, not words, and keep the same caution: no 保證, 穩賺, 無風險 or
+similar. A file that changes a number, ticker or structure is dropped by
+`cheez render` (it reports a warning and that language falls back to English),
+so check the warning list in the render output and fix it once if needed.
+Skip this step if the budget is spent; English is always complete.
 
 ## 6. Publish privately
 
-Publish `var/site/index.html` to the same private artifact URL given in the
+Claude Code: publish `var/site/index.html` to the same private artifact URL given in the
 task prompt (`Artifact` publish with `url` and `file_path`). Never create a
 new artifact during a scheduled run; if the URL is missing or refused, stop
 and report. Never make the page public or share it. Do not commit anything to
 git: the repository is public and all output stays under `var/` (gitignored).
+
+Then, if `cheez config` shows `email.enabled: true`, run
+`.venv/bin/cheez email --send`. It emails a digest (TL;DR, playbook, markets,
+brief) to the configured recipients only; the portfolio stays out unless the
+owner opted in. If it fails, say so in the report; the page is still the
+edition of record.
 
 ## 7. Report
 

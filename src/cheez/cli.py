@@ -6,6 +6,9 @@
   cheez check
   cheez render [--closed | --market-only REASON]
   cheez fail REASON
+  cheez email [--send] [--force]
+  cheez config [show|init|path]
+  cheez schedule [--agent claude|codex]
   cheez status
   cheez demo
   cheez brokerage-check
@@ -59,6 +62,17 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("reason")
     p.add_argument("--edition")
 
+    p = sub.add_parser("email", help="Build the email digest of the latest edition; --send delivers it")
+    p.add_argument("--edition")
+    p.add_argument("--send", action="store_true", help="Send to the configured recipients")
+    p.add_argument("--force", action="store_true", help="Send again even if this revision was already sent")
+
+    p = sub.add_parser("config", help="Show settings, or write a starter cheez.toml")
+    p.add_argument("action", nargs="?", default="show", choices=["show", "init", "path"])
+
+    p = sub.add_parser("schedule", help="Print the cron line and scheduled-task prompt for your delivery time")
+    p.add_argument("--agent", default="claude", choices=["claude", "codex"])
+
     sub.add_parser("status", help="Show recent runs")
     p = sub.add_parser("demo", help="Build the clearly-labelled demonstration edition from fixtures")
     p.add_argument("--live-market", action="store_true", help="Use live market data with the fictional portfolio")
@@ -107,6 +121,54 @@ def main(argv: list[str] | None = None) -> int:
 
         out = fail(args.edition or latest_edition_id(), args.reason)
         print(json.dumps(out, indent=1, default=str))
+        return 0
+
+    if args.cmd == "email":
+        from .delivery import email as mail
+        from .pipeline import load_pack
+        from .state import Store
+        from .config import var_dir
+
+        eid = _eid(args)
+        built = mail.build(eid)
+        out = {"subject": built.subject, "html": str(built.html_path), "eml": str(built.eml_path), "sent": False}
+        if args.send:
+            d = Store(var_dir()).edition_dir(eid)
+            rev = load_pack(eid).revision
+            if mail.already_sent(d, rev) and not args.force:
+                out["detail"] = "already sent for this revision; use --force to send again"
+            else:
+                out["detail"] = mail.send(built)
+                mail.mark_sent(d, rev, out["detail"])
+                out["sent"] = True
+        print(json.dumps(out, indent=1, ensure_ascii=False))
+        return 0
+
+    if args.cmd == "config":
+        from . import settings
+
+        if args.action == "path":
+            print("\n".join(str(p) for p in settings.config_paths()))
+            return 0
+        if args.action == "init":
+            target = settings.config_paths()[0]
+            if target.exists():
+                sys.exit(f"{target} already exists; edit it instead.")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(settings.STARTER)
+            print(f"Wrote {target}")
+            return 0
+        cfg = settings.get()
+        data = cfg.model_dump(mode="json", by_alias=True)
+        data["email"]["to"] = [f"{len(cfg.email.to)} recipient(s)"] if cfg.email.to else []
+        print(json.dumps({"sources": cfg.source, "settings": data}, indent=1, ensure_ascii=False))
+        return 0
+
+    if args.cmd == "schedule":
+        from .schedule import describe
+        from .settings import get
+
+        print(describe(get(), args.agent))
         return 0
 
     if args.cmd == "status":

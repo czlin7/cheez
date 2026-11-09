@@ -28,3 +28,6 @@ dist/
 node_modules/
 /screenshots/
 /backup-out/
+
+# --- Personal settings (may hold your email address) ---
+/cheez.toml

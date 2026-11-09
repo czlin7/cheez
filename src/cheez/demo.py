@@ -19,7 +19,7 @@ from . import session as sess
 from .analytics.technicals import compute
 from .config import INSTRUMENTS, ROOT
 from .models import (
-    Account, Bar, CashFlow, CashLine, Coverage, Execution, FxRate, Identity, Instrument, MarketSnapshot,
+    Account, Bar, CashFlow, CashLine, Coverage, DisplayFx, Execution, FxRate, Identity, Instrument, MarketSnapshot,
     OpenOrder, PortfolioSnapshot, Position, Price, SourceStatus, StockFacts,
 )
 
@@ -33,6 +33,9 @@ LEVELS = {
     "kospi": 4050.0, "tnx": 4.18, "dxy": 99.6, "eurusd": 1.152, "gbpusd": 1.312, "usdjpy": 152.4, "usdcnh": 7.12,
     "wti": 61.4, "brent": 65.2, "gold": 3990.0, "copper": 5.05,
 }
+
+DEMO_FX = {"USD": 1.0, "GBP": 0.762, "EUR": 0.868, "HKD": 7.77, "CNY": 7.12, "TWD": 30.6, "JPY": 152.4,
+           "SGD": 1.30, "AUD": 1.53, "CAD": 1.40, "CHF": 0.80, "KRW": 1435.0}
 
 DEMO_STOCKS = {
     # ticker: (name, exchange, start price, drift, vol, avg volume shares)
@@ -96,8 +99,9 @@ def demo_market(rng: random.Random) -> MarketSnapshot:
             reference=Price(value=hist[-2].c, as_of=as_of, session="end_of_day"), change_abs=hist[-1].c - hist[-2].c,
             change_bp=(hist[-1].c - hist[-2].c) * 100, change_basis="vs previous official close (synthetic)",
             history=hist, delay_note="Synthetic demonstration data."))
+    fx = DisplayFx(per_usd=dict(DEMO_FX), as_of=DEMO_NOW - timedelta(minutes=4), source="Synthetic demonstration rates")
     return MarketSnapshot(generated_at=DEMO_NOW, data_cutoff=DEMO_NOW - timedelta(minutes=4), session=ctx,
-                          instruments=insts, demo=True,
+                          instruments=insts, demo=True, display_fx=fx,
                           sources=[SourceStatus(source="Synthetic demonstration data", ok=True, fetched_at=DEMO_NOW,
                                                 items=len(insts), detail="Seeded random walk; not market data.")])
 
@@ -198,9 +202,16 @@ def build_demo(live_market: bool = False) -> dict:
     ed = json.loads((FIXTURES / "editorial.json").read_text())
     ed["edition_id"] = eid
     (d / "editorial.json").write_text(json.dumps(ed, indent=1))
+    for tr in FIXTURES.glob("editorial.*.json"):  # parallel translations, same shape
+        t = json.loads(tr.read_text())
+        t["edition_id"] = eid
+        (d / tr.name).write_text(json.dumps(t, ensure_ascii=False, indent=1))
     st = store.load()
     (d / "brief.md").write_text(pipeline.write_brief(pack, st))
     out = pipeline.render(eid, now=DEMO_NOW + timedelta(minutes=35))
+    from .delivery import email as mail
+
+    out["email_preview"] = str(mail.build(eid).html_path)
     _ = live_market
     return out
 

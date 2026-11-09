@@ -18,6 +18,9 @@ hosting and an API key); GitHub Actions (this repository is public, so run
 logs would be readable by anyone signed in to GitHub, and Actions cannot reach
 claude.ai artifacts).
 
+**Superseded 9 Nov 2026: delivery at 07:00 in the reader's timezone** (see
+"Morning delivery" below). The original entry is kept for the record.
+
 **One edition per US trading day, started at 07:41 New York time.** The cron is
 `CRON_TZ=America/New_York 41 7 * * 1-5`, so daylight-saving changes in either
 country never move it relative to the US open. A run takes roughly 20–40
@@ -36,6 +39,49 @@ post-release edition (both are one scheduled task away).
 holdings turn out to be mostly Hong Kong or China shares, an Asia-close
 edition would be worth adding; the snapshot already handles HKD positions,
 labels Hong Kong closes and converts currencies explicitly.
+
+**Morning delivery in the reader's timezone (9 Nov 2026).** An edition
+ready about an hour before the US open left a UK reader no time to think.
+The default is now 07:00 Europe/London (run starts 06:20), configurable as
+`schedule.deliver_at` and `schedule.timezone`, with the cron written in the
+reader's own timezone so daylight-saving changes never move it. At that hour
+the US close, overnight futures and Asian close are known and Europe has not
+opened. *Trade-off:* US pre-market quotes are thin overnight prints (labelled)
+and 08:30 New York data arrives after the edition (shown as pending); a manual
+revision covers a second look. An edition is for the US session opening on
+the reader's local date, which makes the same rule work from Asia (the run is
+the previous evening in New York).
+
+**"Today's playbook" first.** Readers wanted the answer before the reasoning:
+which names, what to do, why, what we expect and at what levels. The playbook
+is a view over the validated ideas (no separate list for the model to get
+wrong), plus two short fields per idea (`summary`, `outlook`) and an edition
+`tldr`. The validator's language rules apply to them like any other text.
+"Outlook" is conditional by construction; targets still come only from
+scenarios that the validator checks against levels.
+
+**Three languages, checked as structure.** English, Traditional and
+Simplified Chinese. The model writes a parallel JSON file per language; code
+compares it with the English edition key by key, so a translation can change
+words but not a number, ticker, level, action or link (any difference drops
+that language, with a warning, rather than blocking the edition). Chinese
+certainty phrases are rejected as in English. *Alternative rejected:* machine
+translation at render time (another service, and no check on numbers).
+
+**Currency ruby annotations, off by default.** Any price can carry its
+approximate value in one of twelve common currencies, chosen per reader on
+the page. Rates come from the same run; levels themselves are never
+converted, so validation and the ledger stay in the instrument's currency.
+
+**Email as a second delivery channel.** SMTP for local runs; Resend's HTTPS
+API for cloud runs (SMTP ports are usually closed there, and the key can be a
+proxy-injected network secret). The portfolio is excluded from email by
+default because mailboxes live outside the private page.
+
+**Agent-neutral runbook.** The skill is the one runbook; `AGENTS.md` adapts it
+for OpenAI Codex or other agents (email delivery instead of the artifact). The
+Claude Code guard hook has no equivalent elsewhere, so the docs advise against
+giving other agents the brokerage token.
 
 ## Publication and storage
 

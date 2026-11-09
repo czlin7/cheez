@@ -85,9 +85,6 @@
 
   // ---- Reader preferences: language, second currency, theme (kept in this browser only) ----
   var KEY = "cheez.prefs";
-  var SYM = { USD: "$", GBP: "£", EUR: "€", HKD: "HK$", CNY: "¥", TWD: "NT$", JPY: "¥", SGD: "S$", AUD: "A$", CAD: "C$", CHF: "CHF ", KRW: "₩" };
-  var ZERO = { JPY: 1, KRW: 1, TWD: 1 };
-  var SUF = { k: 1e3, m: 1e6, bn: 1e9, tn: 1e12 };
   var LANG_ATTR = { "en": "en", "zh-Hant": "zhHant", "zh-Hans": "zhHans" };
   function loadPrefs() {
     try { return JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { return {}; }
@@ -100,24 +97,26 @@
   var prefs = loadPrefs();
   function pref(k) { return Object.prototype.hasOwnProperty.call(prefs, k) ? prefs[k] : defaults[k]; }
 
+  // Rates and formatting rules come from the edition (mirrors format.converted() on the server).
   function fxTable(root) {
     var el = (root || document).querySelector("script.cheez-fx");
-    try { return JSON.parse(el.textContent).per_usd || {}; } catch (e) { return {}; }
+    try { return JSON.parse(el.textContent); } catch (e) { return {}; }
   }
-  function convert(v, from, to, rates, suf) {
+  function convert(v, from, to, fx, suf) {
+    var rates = fx.per_usd || {};
     if (!to || to === from || !rates[from] || !rates[to]) return null;
     var x = v / rates[from] * rates[to];
-    var sym = SYM[to] || to + " ";
-    if (suf) return "≈" + sym + (x / SUF[suf]).toLocaleString("en-GB", { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + suf;
-    var d = ZERO[to] || Math.abs(x) >= 10000 ? 0 : 2;
+    var sym = (fx.symbols || {})[to] || to + " ";
+    if (suf) return "≈" + sym + (x / fx.suffix[suf]).toLocaleString("en-GB", { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + suf;
+    var d = (fx.zero_decimal || []).indexOf(to) >= 0 || Math.abs(x) >= 10000 ? 0 : 2;
     return "≈" + sym + x.toLocaleString("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d });
   }
   function applyFx(root) {
     var to = pref("fx");
-    var rates = fxTable(root);
+    var fx = fxTable(root);
     Array.prototype.forEach.call((root || document).querySelectorAll("ruby.m"), function (r) {
       Array.prototype.slice.call(r.querySelectorAll("rt, rp")).forEach(function (n) { n.remove(); });
-      var txt = convert(parseFloat(r.getAttribute("data-v")), r.getAttribute("data-c"), to, rates, r.getAttribute("data-s"));
+      var txt = convert(parseFloat(r.getAttribute("data-v")), r.getAttribute("data-c"), to, fx, r.getAttribute("data-s"));
       if (!txt) return;
       var rp1 = document.createElement("rp"); rp1.textContent = "(";
       var rt = document.createElement("rt"); rt.textContent = txt;

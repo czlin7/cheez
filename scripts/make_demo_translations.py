@@ -12,7 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from cheez.editorial.translate import FIXED_KEYS  # noqa: E402
+from cheez.editorial.translate import is_fixed  # noqa: E402
 
 HANT = [
     "示範：晶片供應疑慮緩解，消費類股持續走低",
@@ -116,15 +116,11 @@ HANS_FIX = {"財測": "业绩指引", "财测": "业绩指引", "加碼": "加�
             "殖利率": "收益率", "曝險": "敞口", "曝险": "敞口", "港幣": "港币", "部位": "仓位", "帐户": "账户", "进场": "入场", "於": "于"}
 
 
-def _fixed(k, parent):
-    return k in FIXED_KEYS and not (k == "label" and parent == "horizon")
-
-
 def strings(obj, fixed=False, out=None, parent=""):
     out = [] if out is None else out
     if isinstance(obj, dict):
         for k, v in obj.items():
-            strings(v, fixed or _fixed(k, parent), out, k)
+            strings(v, fixed or is_fixed(k, parent), out, k)
     elif isinstance(obj, list):
         for v in obj:
             strings(v, fixed, out, parent)
@@ -135,7 +131,7 @@ def strings(obj, fixed=False, out=None, parent=""):
 
 def replace(obj, mapping, fixed=False, parent=""):
     if isinstance(obj, dict):
-        return {k: replace(v, mapping, fixed or _fixed(k, parent), k) for k, v in obj.items()}
+        return {k: replace(v, mapping, fixed or is_fixed(k, parent), k) for k, v in obj.items()}
     if isinstance(obj, list):
         return [replace(v, mapping, fixed, parent) for v in obj]
     if isinstance(obj, str) and not fixed:

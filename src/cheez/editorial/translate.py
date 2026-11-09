@@ -26,6 +26,11 @@ FORBIDDEN_ZH = re.compile(r"保證|保证|穩賺|稳赚|無風險|无风险|必�
 NEGATION_ZH = re.compile(r"(不|非|沒|没|無|无|未)[^。；，,]{0,8}$")
 
 
+def is_fixed(key: str, parent: str) -> bool:
+    """Identifiers and enums are fixed; a horizon's label ("3–6 months") is prose, a read-through's is not."""
+    return key in FIXED_KEYS and not (key == "label" and parent == "horizon")
+
+
 def _certainty(text: str) -> str | None:
     for m in FORBIDDEN_ZH.finditer(text):
         if not NEGATION_ZH.search(text[max(0, m.start() - 10):m.start()]):  # "不是保證的出場價" is the disclaimer we want
@@ -38,9 +43,9 @@ def _walk(en: Any, tr: Any, path: str, out: dict[str, str], problems: list[str],
         if not isinstance(tr, dict) or set(en) != set(tr):
             problems.append(f"{path or 'root'}: fields differ from the English editorial")
             return
+        parent = path.rsplit(".", 1)[-1]
         for k in en:
-            prose_label = k == "label" and path.endswith("horizon")  # "3–6 months" is prose; a read-through label is not
-            _walk(en[k], tr[k], f"{path}.{k}" if path else k, out, problems, fixed or (k in FIXED_KEYS and not prose_label))
+            _walk(en[k], tr[k], f"{path}.{k}" if path else k, out, problems, fixed or is_fixed(k, parent))
     elif isinstance(en, list):
         if not isinstance(tr, list) or len(en) != len(tr):
             problems.append(f"{path}: list length differs from the English editorial")

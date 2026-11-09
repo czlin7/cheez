@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import contextvars
 import re
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Optional
@@ -13,7 +14,7 @@ from zoneinfo import ZoneInfo
 from markupsafe import Markup, escape
 
 from ..models import SESSION_TEXT, Instrument, Price
-from ..settings import CURRENCY_SYMBOL, ZERO_DECIMAL
+from ..settings import CURRENCY_SYMBOL, ZERO_DECIMAL, city_of
 
 NY = ZoneInfo("America/New_York")
 
@@ -33,7 +34,7 @@ class RenderOptions:
 
     @property
     def city(self) -> str:
-        return str(self.tz).split("/")[-1].replace("_", " ")
+        return city_of(self.tz)
 
 
 _OPTS: contextvars.ContextVar[RenderOptions] = contextvars.ContextVar("cheez_render", default=RenderOptions())
@@ -43,12 +44,14 @@ def options() -> RenderOptions:
     return _OPTS.get()
 
 
-def use(opts: RenderOptions):
-    return _OPTS.set(opts)
-
-
-def restore(token) -> None:
-    _OPTS.reset(token)
+@contextmanager
+def rendering(opts: RenderOptions):
+    """``with rendering(opts): ...`` makes ``opts`` visible to the template filters."""
+    token = _OPTS.set(opts)
+    try:
+        yield opts
+    finally:
+        _OPTS.reset(token)
 
 KIND_TEXT = {
     "index": "Index",
@@ -147,11 +150,16 @@ def when(p: Optional[Price], tz_hint: Optional[str] = None) -> str:
     if p.session in ("regular_close", "end_of_day"):
         tz = ZoneInfo(tz_hint) if tz_hint else NY
         return f"{label} {p.as_of.astimezone(tz):%a %-d %b}"
+    return f"{label} · {dual_time(p.as_of)}"
+
+
+def dual_time(ts: datetime) -> str:
+    """'10:01 London (05:01 New York)', or just the New York time when the reader's clock matches it."""
     o = options()
-    t_ny = p.as_of.astimezone(NY)
-    if str(o.tz) == "America/New_York":
-        return f"{label} · {t_ny:%H:%M} New York"
-    return f"{label} · {p.as_of.astimezone(o.tz):%H:%M} {o.city} ({t_ny:%H:%M} NY)"
+    here, ny = ts.astimezone(o.tz), ts.astimezone(NY)
+    if here.utcoffset() == ny.utcoffset():
+        return f"{ny:%H:%M} New York"
+    return f"{here:%H:%M} {o.city} ({ny:%H:%M} New York)"
 
 
 def local(ts: Optional[datetime], fmt: str = "%a %-d %b %Y, %H:%M") -> str:
@@ -187,11 +195,11 @@ def converted(value: float, ccy: str, target: str, per_usd: dict[str, float], su
 
 def _price_markup(text: Markup, value: float, ccy: str, suffix: str = "") -> Markup:
     o = options()
-    attrs = f'class="m" data-v="{value:.10g}" data-c="{escape(ccy)}"' + (f' data-s="{suffix}"' if suffix else "")
     alt = converted(value, ccy, o.convert_to, o.per_usd, suffix)
     if o.fx_mode == "inline":  # email: no ruby, which mail clients render unevenly
-        return text + Markup(f' <span style="color:#92400e;font-size:0.85em">({escape(alt)})</span>') if alt else text
-    rt = Markup(f"<rp>(</rp><rt>{escape(alt)}</rt><rp>)</rp>") if alt and o.fx_mode == "ruby" else ""
+        return text + Markup(f' <span class="fxi">({escape(alt)})</span>') if alt else text
+    attrs = f'class="m" data-v="{value:.10g}" data-c="{escape(ccy)}"' + (f' data-s="{suffix}"' if suffix else "")
+    rt = Markup(f"<rp>(</rp><rt>{escape(alt)}</rt><rp>)</rp>") if alt else ""
     return Markup(f"<ruby {attrs}>") + text + rt + Markup("</ruby>")
 
 

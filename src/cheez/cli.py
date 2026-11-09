@@ -125,21 +125,15 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "email":
         from .delivery import email as mail
-        from .pipeline import load_pack
-        from .state import Store
-        from .config import var_dir
 
-        eid = _eid(args)
-        built = mail.build(eid)
+        built = mail.build(_eid(args))
         out = {"subject": built.subject, "html": str(built.html_path), "eml": str(built.eml_path), "sent": False}
         if args.send:
-            d = Store(var_dir()).edition_dir(eid)
-            rev = load_pack(eid).revision
-            if mail.already_sent(d, rev) and not args.force:
+            if mail.already_sent(built.edition_dir, built.revision) and not args.force:
                 out["detail"] = "already sent for this revision; use --force to send again"
             else:
                 out["detail"] = mail.send(built)
-                mail.mark_sent(d, rev, out["detail"])
+                mail.mark_sent(built.edition_dir, built.revision, out["detail"])
                 out["sent"] = True
         print(json.dumps(out, indent=1, ensure_ascii=False))
         return 0

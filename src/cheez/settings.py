@@ -20,10 +20,10 @@ import tomllib
 from datetime import date, datetime, time, timedelta
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional
 from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator
 
 from .config import ROOT
 
@@ -50,6 +50,14 @@ def _currency(v: str) -> str:
     return v
 
 
+Currency = Annotated[str, AfterValidator(_currency)]  # "" means off
+
+
+def city_of(tz) -> str:
+    """'Europe/London' -> 'London', 'America/New_York' -> 'New York'."""
+    return str(tz).split("/")[-1].replace("_", " ")
+
+
 class Schedule(_M):
     deliver_at: str = "07:00"  # local time the brief should be ready
     timezone: str = "Europe/London"  # the reader's timezone; every time in the report uses it
@@ -74,7 +82,7 @@ class Schedule(_M):
 
     @property
     def city(self) -> str:
-        return self.timezone.split("/")[-1].replace("_", " ")
+        return city_of(self.timezone)
 
     @property
     def deliver_time(self) -> time:
@@ -98,13 +106,8 @@ class Schedule(_M):
 class Report(_M):
     languages: list[Language] = Field(default_factory=lambda: ["en", "zh-Hant", "zh-Hans"])
     default_language: Language = "en"
-    convert_to: str = ""  # "" = off; otherwise a DISPLAY_CURRENCIES code
+    convert_to: Currency = ""  # "" = off; otherwise a DISPLAY_CURRENCIES code
     max_trades: int = Field(3, ge=1, le=6)
-
-    @field_validator("convert_to")
-    @classmethod
-    def _cur(cls, v: str) -> str:
-        return _currency(v)
 
     @field_validator("languages")
     @classmethod
@@ -123,14 +126,9 @@ class Email(_M):
     smtp_starttls: bool = True
     include_portfolio: bool = False
     language: str = ""  # empty: report.default_language
-    convert_to: str = ""  # empty: report.convert_to
+    convert_to: Currency = ""  # empty: report.convert_to
     page_url: str = ""  # link to the full private page
     subject_prefix: str = "Cheez Daily"
-
-    @field_validator("convert_to")
-    @classmethod
-    def _cur(cls, v: str) -> str:
-        return _currency(v)
 
 
 class Publish(_M):

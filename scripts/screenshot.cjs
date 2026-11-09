@@ -24,7 +24,7 @@ for (const [name, width, height] of [["phone", 390, 844], ["laptop", 1280, 900]]
       const wide = [];
       for (const el of document.querySelectorAll("body *")) {
         const r = el.getBoundingClientRect();
-        if (r.right > de.clientWidth + 1 && !el.closest(".tablewrap, .edbar nav, .pulse")) wide.push(el.tagName + "." + el.className);
+        if (r.right > de.clientWidth + 1 && !el.closest(".tablewrap, .edbar nav, .pulse, .sr-only")) wide.push(el.tagName + "." + el.className);
       }
       return { scrollWidth: de.scrollWidth, clientWidth: de.clientWidth, height: de.scrollHeight, wide: wide.slice(0, 8) };
     });

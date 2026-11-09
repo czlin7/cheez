@@ -140,7 +140,9 @@ def target_session(now_utc: datetime, reader_tz: str | ZoneInfo | None = None) -
 def us_session_context(now_utc: datetime, reader_tz: str | ZoneInfo | None = None) -> SessionContext:
     """Describe the US session this edition is for, from the point of view of ``now_utc``."""
     tz = _reader_tz(reader_tz)
-    city = str(tz).split("/")[-1].replace("_", " ")
+    from .settings import city_of
+
+    city = city_of(tz)
     d, open_day = target_session(now_utc, tz)
     notes: list[str] = []
     if not open_day:

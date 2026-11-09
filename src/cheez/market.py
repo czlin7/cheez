@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from . import session as sess
-from .config import INSTRUMENTS, STALE_INSTRUMENT_HOURS, InstrumentDef
+from .config import FX_SYMBOL, INSTRUMENTS, STALE_INSTRUMENT_HOURS, InstrumentDef
 from .models import Bar, DisplayFx, Instrument, MarketSnapshot, Price, SourceStatus
 from .net import Fetcher, FetchError
 from .sources import treasury, yahoo
@@ -183,16 +183,20 @@ def display_fx(f: Fetcher, now: datetime) -> DisplayFx:
 
     out = DisplayFx(per_usd={"USD": 1.0}, as_of=now)
     for c in DISPLAY_CURRENCIES:
-        if c == "USD":
-            continue
-        try:
-            q = yahoo.live_quote(f, f"{c}=X")
-            if q.regular_price:
-                out.per_usd[c] = float(q.regular_price)
-                out.as_of = min(out.as_of or now, q.regular_time or now)
-        except Exception:
-            continue
+        q = fx_quote(f, "USD", c) if c != "USD" else None
+        if q:
+            out.per_usd[c] = q[0]
+            out.as_of = min(out.as_of or now, q[1] or now)
     return out
+
+
+def fx_quote(f: Fetcher, a: str, b: str) -> Optional[tuple[float, Optional[datetime]]]:
+    """1 unit of ``a`` in ``b`` and its timestamp, or None (best effort)."""
+    try:
+        q = yahoo.live_quote(f, FX_SYMBOL.format(a=a, b=b))
+    except Exception:
+        return None
+    return (float(q.regular_price), q.regular_time) if q.regular_price else None
 
 
 def snapshot_problems(snap: MarketSnapshot) -> list[str]:

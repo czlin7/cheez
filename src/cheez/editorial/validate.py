@@ -60,6 +60,7 @@ class IdeaDerived:
     distance_to_zone_pct: Optional[float] = None  # + means price is above the zone
     reward_risk: Optional[float] = None
     reward_risk_basis: Optional[str] = None
+    target: Optional[float] = None  # the most conservative upside scenario above the zone midpoint
     downside_to_invalidation_pct: Optional[float] = None
     held: bool = False
 
@@ -189,10 +190,11 @@ def _check_idea(
         mid = (idea.entry.low + idea.entry.high) / 2
         risk = mid - idea.invalidation.level
         ups = [x for x in targets if x > mid]
+        der.target = min(ups) if ups else None
         if any(x <= idea.invalidation.level for x in targets):
             rep.warnings.append(f"{tag}: a scenario target sits at or below invalidation; check scenario labels.")
         if risk > 0 and ups:
-            base = min(ups)  # the most conservative upside scenario
+            base = der.target  # the most conservative upside scenario
             der.reward_risk = (base - mid) / risk
             der.reward_risk_basis = (
                 f"({base:.2f} − {mid:.2f}) ÷ ({mid:.2f} − {idea.invalidation.level:.2f}), using the zone midpoint, "

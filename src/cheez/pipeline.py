@@ -76,7 +76,7 @@ def _runs_for(st: State, eid: str) -> list[RunRecord]:
 
 
 def _fx_rates(f: Fetcher, snap: PortfolioSnapshot, now: datetime) -> list[FxRate]:
-    from .sources import yahoo
+    from .market import fx_quote
 
     pairs: set[tuple[str, str]] = set()
     for a in snap.accounts:
@@ -89,13 +89,9 @@ def _fx_rates(f: Fetcher, snap: PortfolioSnapshot, now: datetime) -> list[FxRate
                 pairs.add((c.currency.upper(), base))
     out = []
     for a, b in sorted(pairs):
-        try:
-            q = yahoo.live_quote(f, f"{a}{b}=X")
-            if q.regular_price:
-                out.append(FxRate(pair=f"{a}{b}", rate=float(q.regular_price), as_of=q.regular_time or now,
-                                  source="Yahoo Finance"))
-        except Exception:
-            pass
+        q = fx_quote(f, a, b)
+        if q:
+            out.append(FxRate(pair=f"{a}{b}", rate=q[0], as_of=q[1] or now, source="Yahoo Finance"))
     return out
 
 
@@ -361,7 +357,8 @@ def render(edition_id: str, *, closed: bool = False, market_only_reason: Optiona
 
         translations, tr_warnings = translate.load(d, editorial, settings().report.languages)
         rep.warnings.extend(tr_warnings)
-    with site.rendering(site.render_options(pack.market, translations)):
+    opts = site.render_options(pack.market, translations)
+    with site.rendering(opts):
         view = site.build_view(edition=meta, market=pack.market, stocks=pack.stocks, editorial=editorial, report=rep,
                                portfolio=pack.portfolio, state=st, run=run, previous=previous)
         body = site.render_edition_body(view)
@@ -384,7 +381,7 @@ def render(edition_id: str, *, closed: bool = False, market_only_reason: Optiona
 
     site_dir = var_dir() / ("site-demo" if pack.demo else "site")
     site_dir.mkdir(parents=True, exist_ok=True)
-    with site.rendering(site.render_options(pack.market, translations)):
+    with site.rendering(opts):
         index_fragment = site.assemble_index(body=body, view=view, state=st, archive_items=archive_items, document=False)
         index_doc = site.assemble_index(body=body, view=view, state=st, archive_items=archive_items, document=True)
         edition_doc = site.render_page(body=body, view=view, document=True, archive=None, home_href="../cheez-daily.html")

@@ -23,7 +23,8 @@ from typing import Optional
 
 from .. import i18n
 from .. import settings as settings_mod
-from ..render import charts, site
+from ..render import site
+from ..render.format import FILTERS, num, tx
 
 UTC = timezone.utc
 RESEND_URL = "https://api.resend.com/emails"
@@ -36,27 +37,24 @@ class Built:
     text: str
     html_path: Path
     eml_path: Path
+    edition_dir: Path
+    revision: int
 
 
-def _text_version(view: dict, page_url: str, lang: str) -> str:
-    from markupsafe import Markup
-
-    def plain(x) -> str:
-        return Markup(str(x)).striptags()
-
+def _text_version(view: dict, headline: str, page_url: str, lang: str) -> str:
     ed = view["editorial"]
-    out = [plain(site._env().filters["tx"](ed.headline)), ""]
+    out = [headline, ""]
     for t in ed.tldr:
-        out.append("- " + plain(site._env().filters["tx"](t)))
+        out.append("- " + tx(t).striptags())
     out += ["", i18n.ui_text("Today's playbook", lang).upper()]
     for c in view["playbook"]["cards"]:
         i = c["idea"]
-        line = f"{c['rank']}. {i.symbol}: {plain(site._env().filters['action_text'](i.action))}"
+        line = f"{c['rank']}. {i.symbol}: {FILTERS['action_text'](i.action).striptags()}"
         if i.entry:
-            line += f" | {i18n.ui_text('Entry zone', lang)} {i.entry.low:,.2f}-{i.entry.high:,.2f}"
+            line += f" | {i18n.ui_text('Entry zone', lang)} {num(i.entry.low, 2)}-{num(i.entry.high, 2)}"
         if i.invalidation:
-            line += f" | {i18n.ui_text('Invalidation', lang)} {i.invalidation.level:,.2f}"
-        out += [line, "   " + plain(site._env().filters["tx"](c["why"]))]
+            line += f" | {i18n.ui_text('Invalidation', lang)} {num(i.invalidation.level, 2)}"
+        out += [line, "   " + tx(c["why"]).striptags()]
     if not view["playbook"]["cards"]:
         out.append(i18n.ui_text("No trade today", lang))
     if page_url:
@@ -80,9 +78,12 @@ def build(edition_id: str, out_dir: Optional[Path] = None) -> Built:
     if editorial is None or not rep.ok:
         raise SystemExit("This edition has no publishable editorial; there is nothing to email.")
     lang = cfg.email_language
-    translations, _ = translate.load(d, editorial, cfg.report.languages)
-    opts = site.render_options(pack.market, translations, lang=lang, convert_to=cfg.email_currency, fx_mode="inline")
-    opts.langs = (lang,)  # one language per email; no switching markup
+    published = d / "translations.json"  # what the page was rendered with, so page and email agree
+    translations = (json.loads(published.read_text()) if published.exists()
+                    else translate.load(d, editorial, [lang])[0])
+    # One language per email: no switching markup.
+    opts = site.render_options(pack.market, translations, lang=lang, langs=(lang,), convert_to=cfg.email_currency,
+                               fx_mode="inline")
     meta = site.EditionMeta(id=edition_id, date=pack.edition_date, kind_label=pack.kind_label,
                             published_at=datetime.now(tz=UTC), data_cutoff=pack.market.data_cutoff,
                             status="demo" if pack.demo else "complete", demo=pack.demo, revision=pack.revision)
@@ -91,25 +92,20 @@ def build(edition_id: str, out_dir: Optional[Path] = None) -> Built:
         view = site.build_view(edition=meta, market=pack.market, stocks=pack.stocks, editorial=editorial, report=rep,
                                portfolio=pack.portfolio if cfg.email.include_portfolio else None,
                                state=store.load(), run=run)
-        for c in view["playbook"]["cards"]:
-            f = c["facts"]
-            c["spark_text"] = charts.text_sparkline([b.c for b in f.history[-63:]]) if f else ""
-        for p in view["pulse"]:
-            p["spark_text"] = charts.text_sparkline([b.c for b in p["inst"].history[-44:]], width=16)
-        env = site._env()
-        headline = str(env.filters["tx"](editorial.headline).striptags())
+        headline = tx(editorial.headline).striptags()
         subject = f"{cfg.email.subject_prefix} · {pack.edition_date:%-d %b}: {headline}"
-        html = env.get_template("email.html.j2").render(
+        html = site._env().get_template("email.html.j2").render(
             v=view, page_url=cfg.email.page_url, include_portfolio=cfg.email.include_portfolio,
             html_lang=i18n.HTML_LANG.get(lang, "en"), date_label=i18n.long_date(pack.edition_date, lang), subject=subject,
             city=opts.city)
-        text = _text_version(view, cfg.email.page_url, lang)
+        text = _text_version(view, headline, cfg.email.page_url, lang)
     out_dir = out_dir or (var_dir() / ("site-demo" if pack.demo else "site"))
     out_dir.mkdir(parents=True, exist_ok=True)
     html_path, eml_path = out_dir / "email.html", out_dir / "email.eml"
     html_path.write_text(html)
     eml_path.write_bytes(bytes(_message(subject, html, text, cfg)))
-    return Built(subject=subject, html=html, text=text, html_path=html_path, eml_path=eml_path)
+    return Built(subject=subject, html=html, text=text, html_path=html_path, eml_path=eml_path, edition_dir=d,
+                 revision=pack.revision)
 
 
 def _message(subject: str, html: str, text: str, cfg: settings_mod.Settings) -> EmailMessage:

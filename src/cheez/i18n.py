@@ -14,7 +14,9 @@ from typing import Mapping
 
 from markupsafe import Markup, escape
 
-LANGS = ("en", "zh-Hant", "zh-Hans")
+from .settings import LANGUAGES
+
+LANGS = tuple(LANGUAGES)
 ATTR = {"en": "data-en", "zh-Hant": "data-zh-hant", "zh-Hans": "data-zh-hans"}
 HTML_LANG = {"en": "en-GB", "zh-Hant": "zh-Hant", "zh-Hans": "zh-Hans"}
 
@@ -148,10 +150,7 @@ UI: dict[str, tuple[str, str]] = {
         ("本期沒有此語言的翻譯，顯示英文。", "本期没有此语言的翻译，显示英文。"),
 }
 
-WEEKDAYS = {
-    "zh-Hant": ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"],
-    "zh-Hans": ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"],
-}
+ZH_WEEKDAYS = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]  # same in both scripts
 
 
 def ui_text(en: str, lang: str) -> str:
@@ -163,7 +162,7 @@ def ui_text(en: str, lang: str) -> str:
 def long_date(d: date, lang: str) -> str:
     if lang == "en":
         return d.strftime("%A %-d %B %Y")
-    return f"{d.year}年{d.month}月{d.day}日 {WEEKDAYS[lang][d.weekday()]}"
+    return f"{d.year}年{d.month}月{d.day}日 {ZH_WEEKDAYS[d.weekday()]}"
 
 
 def span(versions: Mapping[str, str], lang: str, *, html: bool = False, langs: tuple[str, ...] = LANGS) -> Markup:

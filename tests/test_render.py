@@ -35,21 +35,15 @@ def test_server_side_conversion_when_configured(cheez_home, monkeypatch):
 
 
 def test_prose_dollar_amounts_become_convertible():
-    tok = fmt.use(fmt.RenderOptions(convert_to="GBP", per_usd={"USD": 1.0, "GBP": 0.8}))
-    try:
+    with fmt.rendering(fmt.RenderOptions(convert_to="GBP", per_usd={"USD": 1.0, "GBP": 0.8})):
         out = str(fmt.tx("Revenue of $1.9bn and a target near $188."))
-    finally:
-        fmt.restore(tok)
     assert 'data-v="1900000000" data-c="USD" data-s="bn"' in out and "≈£1.5bn" in out
     assert "≈£150.40" in out
 
 
 def test_text_is_escaped_before_prices_are_marked_up():
-    tok = fmt.use(fmt.RenderOptions())
-    try:
+    with fmt.rendering(fmt.RenderOptions()):
         out = fmt.tx('<script>alert("x")</script> costs $5')
-    finally:
-        fmt.restore(tok)
     assert isinstance(out, Markup) and "<script>" not in out and "&lt;script&gt;" in out
 
 

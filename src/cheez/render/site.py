@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import json
 import re
+from functools import lru_cache
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
+from jinja2 import Environment, FileSystemLoader, StrictUndefined, pass_context, select_autoescape
 from markupsafe import Markup
 
 from .. import i18n
@@ -22,13 +23,15 @@ from ..editorial.validate import IdeaDerived, ValidationReport
 from ..models import Editorial, Idea, MarketSnapshot, PortfolioSnapshot, RunRecord, StockFacts
 from ..state import State, archive_templates, state_script
 from . import charts
-from .format import FILTERS, NY, RenderOptions, options, restore, use
+from .format import FILTERS, SUFFIX as FORMAT_SUFFIX, RenderOptions, dual_time, local, options, rendering  # noqa: F401 (rendering re-exported)
 
 HERE = Path(__file__).parent
 UTC = timezone.utc
 
 
+@lru_cache(maxsize=1)
 def _env() -> Environment:
+    """Built once: filters and globals read the render options at call time."""
     env = Environment(
         loader=FileSystemLoader(str(HERE / "templates")),
         autoescape=select_autoescape(["html", "j2"]),
@@ -36,7 +39,9 @@ def _env() -> Environment:
         trim_blocks=False,
         lstrip_blocks=False,
     )
-    env.filters.update(FILTERS)
+    # Filters read the per-render options (language, timezone, currency), so Jinja must never
+    # evaluate them once at compile time on constant input: pass_context marks them as non-constant.
+    env.filters.update({k: pass_context(lambda _ctx, *a, _f=f, **kw: _f(*a, **kw)) for k, f in FILTERS.items()})
     env.filters["abs"] = abs
     env.globals["long_date"] = lambda d: i18n.span(
         {k: i18n.long_date(d, k) for k in options().langs}, options().lang, langs=options().langs)
@@ -65,9 +70,7 @@ def session_text(ctx) -> str:
         return f"US markets closed today · next session {nxt:%a %-d %b}" if nxt else "US markets closed today"
     o, opts = ctx.open_utc, options()
     if ctx.phase == "pre_open":
-        if str(opts.tz) == "America/New_York":
-            return f"US pre-market · opens {o.astimezone(NY):%H:%M} New York"
-        return f"US pre-market · opens {o.astimezone(opts.tz):%H:%M} {opts.city} ({o.astimezone(NY):%H:%M} New York)"
+        return f"US pre-market · opens {dual_time(o)}"
     if ctx.phase == "regular":
         return f"US regular session in progress (opened {o.astimezone(opts.tz):%H:%M} {opts.city})"
     if ctx.phase == "post_close":
@@ -135,11 +138,11 @@ def _portfolio_view(p: Optional[PortfolioSnapshot]) -> dict:
     fx = FxBook.from_rates(p.fx)
     views = [account_view(a, fx) for a in p.accounts]
     o = options()
-    aside = ("Demonstration data" if p.demo else f"Longbridge, read-only · as of {p.as_of.astimezone(o.tz):%H:%M} {o.city}"
+    aside = ("Demonstration data" if p.demo else f"Longbridge, read-only · as of {local(p.as_of, '%H:%M')}"
              if p.as_of else "Longbridge, read-only")
     msgs = list(p.messages)
     for r in p.fx:
-        msgs.append(f"FX used: 1 {r.pair[:3]} = {r.rate:.4f} {r.pair[3:]} ({r.source}, {r.as_of.astimezone(o.tz):%H:%M} {o.city}).")
+        msgs.append(f"FX used: 1 {r.pair[:3]} = {r.rate:.4f} {r.pair[3:]} ({r.source}, {local(r.as_of, '%H:%M')}).")
     for a in p.accounts:
         if a.margin_or_financing_note:
             msgs.append(a.margin_or_financing_note)
@@ -174,12 +177,13 @@ def _feasibility(idea, facts: Optional[StockFacts], p: Optional[PortfolioSnapsho
 
 
 def render_options(market: Optional[MarketSnapshot], translations: Optional[dict] = None, *,
-                   lang: Optional[str] = None, convert_to: Optional[str] = None, fx_mode: str = "ruby") -> RenderOptions:
+                   lang: Optional[str] = None, langs: Optional[tuple[str, ...]] = None,
+                   convert_to: Optional[str] = None, fx_mode: str = "ruby") -> RenderOptions:
     cfg = settings_mod.get()
     return RenderOptions(
         tz=cfg.schedule.tz,
         lang=lang or cfg.report.default_language,
-        langs=tuple(cfg.report.languages),
+        langs=langs or tuple(cfg.report.languages),
         convert_to=cfg.report.convert_to if convert_to is None else convert_to,
         per_usd=dict(market.display_fx.per_usd) if market else {},
         fx_mode=fx_mode,
@@ -187,47 +191,33 @@ def render_options(market: Optional[MarketSnapshot], translations: Optional[dict
     )
 
 
-class rendering:
-    """``with rendering(opts): ...`` makes ``opts`` visible to the template filters."""
-
-    def __init__(self, opts: RenderOptions):
-        self.opts = opts
-
-    def __enter__(self) -> RenderOptions:
-        self._token = use(self.opts)
-        return self.opts
-
-    def __exit__(self, *exc) -> None:
-        restore(self._token)
-
-
 # ---------------------------------------------------------------------------
 # Today's playbook and the market pulse
 # ---------------------------------------------------------------------------
 
-PULSE = [("es", "S&P 500 futures"), ("nq", "Nasdaq 100 futures"), ("vix", "VIX"), ("ust10y", "US 10-year"),
-         ("dxy", "Dollar index"), ("gbpusd", "GBP/USD"), ("wti", "WTI crude"), ("gold", "Gold")]
+# (instrument keys in order of preference, label)
+PULSE = [(("es",), "S&P 500 futures"), (("nq",), "Nasdaq 100 futures"), (("vix",), "VIX"),
+         (("ust10y", "tnx"), "US 10-year"), (("dxy",), "Dollar index"), (("gbpusd",), "GBP/USD"),
+         (("wti",), "WTI crude"), (("gold",), "Gold")]
+THREE_MONTHS = 63  # sessions shown in playbook sparklines
+PULSE_DAYS = 44
+
+
+def _closes(item, n: int) -> list[float]:
+    return [b.c for b in item.history[-n:]] if item else []
 
 
 def _pulse(m: MarketSnapshot) -> list[dict]:
     by_key = {i.key: i for i in m.instruments}
     out = []
-    for key, label in PULSE:
-        i = by_key.get(key) or (by_key.get("tnx") if key == "ust10y" else None)
-        if i is None or i.last is None:
+    for keys, label in PULSE:
+        i = next((by_key[k] for k in keys if k in by_key and by_key[k].last), None)
+        if i is None:
             continue
-        out.append({"inst": i, "label": label,
-                    "spark": charts.sparkline([b.c for b in i.history[-44:]], width=96, height=28,
-                                              label=f"{label}, recent daily closes")})
+        closes = _closes(i, PULSE_DAYS)
+        out.append({"inst": i, "label": label, "spark_text": charts.text_sparkline(closes, width=16),
+                    "spark": charts.sparkline(closes, width=96, height=28, label=f"{label}, recent daily closes")})
     return out
-
-
-def _target(idea: Idea) -> Optional[float]:
-    if not idea.entry:
-        return None
-    mid = (idea.entry.low + idea.entry.high) / 2
-    ups = [s.target for s in idea.scenarios if s.target is not None and s.target > mid]
-    return min(ups) if ups else None
 
 
 def _base_scenario(idea: Idea):
@@ -240,11 +230,11 @@ def _playbook(ideas: list[dict], editorial: Optional[Editorial], stocks: dict[st
     for rank, it in enumerate(ideas[:max_trades], 1):
         idea: Idea = it["idea"]
         f: Optional[StockFacts] = it["facts"]
-        hist = [b.c for b in (f.history[-63:] if f else [])]
+        hist = _closes(f, THREE_MONTHS)
         scen = _base_scenario(idea)
         cards.append({
             "rank": rank, "idea": idea, "facts": f, "derived": it["derived"],
-            "held": idea.symbol.upper() in held, "target": _target(idea),
+            "held": idea.symbol.upper() in held, "target": it["derived"].target, "spark_text": charts.text_sparkline(hist),
             "why": idea.summary or idea.thesis,
             "outlook": idea.outlook or (scen.rationale if scen else None),
             "outlook_horizon": None if idea.outlook else (scen.horizon if scen else None),
@@ -262,7 +252,7 @@ def _playbook(ideas: list[dict], editorial: Optional[Editorial], stocks: dict[st
                 continue
             f = stocks.get(sym)
             radar.append({"featured": fs, "facts": f, "held": sym in held,
-                          "spark": charts.sparkline([b.c for b in (f.history[-63:] if f else [])], width=280, height=48,
+                          "spark": charts.sparkline(_closes(f, THREE_MONTHS), width=280, height=48,
                                                     label=f"{sym}, last three months of daily closes")})
     return {"cards": cards, "radar": radar}
 
@@ -287,7 +277,7 @@ def build_view(
     for g in sorted(by_group, key=lambda x: order.get(x, 99)):
         groups.append((g, by_group[g]))
     inst_labels = {i.key: i.label for i in market.instruments}
-    sparks = {i.key: charts.sparkline([b.c for b in i.history[-66:]], width=72, height=22,
+    sparks = {i.key: charts.sparkline(_closes(i, THREE_MONTHS), width=72, height=22,
                                       label=f"{i.label}, last three months")
               for i in market.instruments if len(i.history) > 5}
     held = holdings_index(portfolio)
@@ -330,8 +320,12 @@ def build_view(
         "playbook": _playbook(ideas, editorial, stocks, held, cfg.report.max_trades),
         "pulse": _pulse(market),
         "sparks": sparks,
-        "fx_json": Markup(json.dumps({"per_usd": fx.per_usd, "as_of": fx.as_of.isoformat() if fx.as_of else None,
-                                      "source": fx.source}).replace("<", "\\u003c")),
+        "fx_json": Markup(json.dumps({
+            "per_usd": fx.per_usd, "as_of": fx.as_of.isoformat() if fx.as_of else None, "source": fx.source,
+            # the formatting rules of format.converted(), so page and server annotate alike
+            "symbols": settings_mod.CURRENCY_SYMBOL, "zero_decimal": sorted(settings_mod.ZERO_DECIMAL),
+            "suffix": {k: v for k, v in FORMAT_SUFFIX.items() if k in ("k", "m", "bn", "tn")},
+        }, ensure_ascii=False).replace("<", "\\u003c")),
         "session": market.session,
         "session_text": session_text(market.session),
         "market": market,
@@ -353,6 +347,11 @@ def build_view(
     }
 
 
+@lru_cache(maxsize=1)
+def _static() -> tuple[str, str, str]:
+    return tuple((HERE / "static" / n).read_text() for n in ("cheez.css", "cheez.js", "logo.svg"))  # type: ignore[return-value]
+
+
 def render_edition_body(view: dict) -> str:
     return _env().get_template("edition.html.j2").render(v=view)
 
@@ -360,8 +359,7 @@ def render_edition_body(view: dict) -> str:
 def render_page(*, body: str, view: dict, document: bool, archive: Optional[list[dict]], extra_tail: str = "",
                 home_href: str = "#latest") -> str:
     env = _env()
-    css = (HERE / "static" / "cheez.css").read_text()
-    js = (HERE / "static" / "cheez.js").read_text()
+    css, js, logo = _static()
     ed: EditionMeta = view["edition"]
     nxt = ed.next_expected.isoformat() if ed.next_expected else ""
     title = "Cheez Daily" if archive is not None else f"Cheez Daily {ed.date:%-d %b %Y}"
@@ -372,7 +370,7 @@ def render_page(*, body: str, view: dict, document: bool, archive: Optional[list
         langs=[(k, settings_mod.LANGUAGES[k]) for k in o.langs],
         convert_to=o.convert_to,
         currencies=settings_mod.DISPLAY_CURRENCIES,
-        logo=(HERE / "static" / "logo.svg").read_text(),
+        logo=logo,
         title=title,
         document=document,
         css=css,
@@ -383,7 +381,7 @@ def render_page(*, body: str, view: dict, document: bool, archive: Optional[list
         archive=archive,
         has_editorial=view["editorial"] is not None,
         has_featured=bool(view["editorial"] and view["editorial"].featured),
-        generated=ed.published_at.astimezone(o.tz).strftime(f"%-d %b %Y %H:%M {o.city}"),
+        generated=local(ed.published_at, "%-d %b %Y %H:%M"),
         home_href=home_href,
     )
     if extra_tail:
